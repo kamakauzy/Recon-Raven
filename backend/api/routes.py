@@ -735,3 +735,49 @@ async def push_test():
         body="Push notifications are working!",
     )
     return {"sent": True}
+
+
+# ── Federation ───────────────────────────────────────────────
+
+_federation_service = None
+
+
+def set_federation_service(fs):
+    global _federation_service
+    _federation_service = fs
+
+
+@router.get("/federation/status")
+async def federation_status():
+    if not _federation_service:
+        return {"enabled": False}
+    return _federation_service.get_status()
+
+
+@router.get("/federation/peers")
+async def federation_peers():
+    if not _federation_service:
+        return []
+    return _federation_service.get_peers()
+
+
+@router.post("/federation/receive")
+async def federation_receive(payload: dict):
+    """Receive an event shared from a peer node."""
+    # For now, log it — eventually persist to DB
+    from_node = payload.get("from_node", "unknown")
+    event = payload.get("event", {})
+    logger.info("Received federated event from %s: %s",
+                from_node, event.get("event_type", "?"))
+    return {"received": True}
+
+
+@router.get("/federation/peer/{node_id}/events")
+async def federation_peer_events(node_id: str, limit: int = 50):
+    """Proxy: fetch events from a remote peer."""
+    if not _federation_service:
+        raise HTTPException(503, "Federation not available")
+    result = await _federation_service.query_peer(node_id, f"events?limit={limit}")
+    if result is None:
+        raise HTTPException(404, f"Peer {node_id} not reachable")
+    return result

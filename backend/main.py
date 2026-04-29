@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import load_settings
 from .db.database import init_db, get_session_factory
-from .api.routes import router as api_router, set_session_factory, set_services, set_scheduler, set_classifier, set_tx_service, set_fissure_service, set_push_service
+from .api.routes import router as api_router, set_session_factory, set_services, set_scheduler, set_classifier, set_tx_service, set_fissure_service, set_push_service, set_federation_service
 from .api.websocket import (
     ws_manager, spectrum_endpoint, alerts_endpoint, status_endpoint,
 )
@@ -23,6 +23,7 @@ from .services.classifier import Classifier
 from .services.tx_service import TXService
 from .services.fissure_service import FissureService
 from .services.push_service import PushService
+from .services.federation_service import FederationService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -140,6 +141,23 @@ async def lifespan(app: FastAPI):
 
     capture_service.set_event_callback(broadcast_with_push)
 
+    # 5e. Federation service
+    federation_service = FederationService(settings)
+    set_federation_service(federation_service)
+    await federation_service.start()
+
+    # Wire federation event sharing into the broadcast chain
+    _prev_broadcast = broadcast_with_push
+
+    async def broadcast_with_federation(event_data):
+        await _prev_broadcast(event_data)
+        try:
+            await federation_service.share_event(event_data)
+        except Exception as e:
+            logger.debug("Federation share error: %s", e)
+
+    capture_service.set_event_callback(broadcast_with_federation)
+
     # 6. Scheduler
     scheduler = RavenScheduler(
         settings=settings,
@@ -172,6 +190,7 @@ async def lifespan(app: FastAPI):
         await capture_service.stop_capture(task.task_id)
 
     scheduler.stop()
+    await federation_service.stop()
     await gps_poller.stop()
     logger.info("Shutdown complete")
 
