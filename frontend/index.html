@@ -26,11 +26,15 @@
   <nav id="tab-bar">
     <button class="tab active" data-tab="spectrum">Spectrum</button>
     <button class="tab" data-tab="alerts">Alerts</button>
-    <button class="tab" data-tab="devices">Devices</button>
-    <button class="tab" data-tab="baselines">Baselines</button>
     <button class="tab" data-tab="map">Map</button>
+    <button class="tab" data-tab="devices">Devices</button>
+    <button class="tab" data-tab="classifier">Classifier</button>
+    <button class="tab" data-tab="df">DF</button>
+    <button class="tab" data-tab="baselines">Baselines</button>
+    <button class="tab" data-tab="fissure">FISSURE</button>
     <button class="tab" data-tab="reports">Reports</button>
     <button class="tab" data-tab="tx">TX</button>
+    <button class="tab" data-tab="federation">Federation</button>
   </nav>
 
   <main id="content">
@@ -95,6 +99,87 @@
       </div>
     </section>
 
+    <!-- Classifier -->
+    <section id="tab-classifier" class="tab-panel">
+      <div class="panel-header">
+        <h2>Signal Classifier</h2>
+      </div>
+      <div class="classifier-layout">
+        <div class="card" style="margin-bottom:12px;">
+          <h3>Classify Signal</h3>
+          <div class="controls" style="margin-top:8px;">
+            <label>Freq: <input type="number" id="cls-freq" value="433.92" step="0.01"> MHz</label>
+            <label>Duration: <input type="number" id="cls-duration" value="50" step="1"> ms</label>
+            <label>Modulation: <select id="cls-mod">
+              <option value="">Unknown</option>
+              <option value="OOK">OOK</option>
+              <option value="FSK">FSK</option>
+              <option value="LoRa">LoRa</option>
+              <option value="FM">FM</option>
+              <option value="DMR">DMR</option>
+              <option value="P25">P25</option>
+            </select></label>
+            <label>Model: <input type="text" id="cls-model" placeholder="e.g. Acurite-Tower" style="width:140px;padding:4px 6px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:12px;"></label>
+            <button id="btn-classify" class="btn btn-green">Classify</button>
+          </div>
+          <div id="cls-result" class="status-bar" style="margin-top:8px; display:none;"></div>
+        </div>
+        <div class="card">
+          <h3>Loaded Rules</h3>
+          <div id="classifier-rules" class="list"><p class="placeholder">Loading...</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Direction Finding -->
+    <section id="tab-df" class="tab-panel">
+      <div class="panel-header">
+        <h2>Direction Finding</h2>
+      </div>
+      <div class="card" style="margin-bottom:12px;">
+        <h3>Bearing Entry</h3>
+        <div id="df-bearings">
+          <div class="df-bearing-row controls" style="margin-bottom:6px;">
+            <label>Lat: <input type="number" class="df-lat" value="" step="0.0001" placeholder="29.9500" style="width:100px;"></label>
+            <label>Lon: <input type="number" class="df-lon" value="" step="0.0001" placeholder="-90.0700" style="width:100px;"></label>
+            <label>Bearing: <input type="number" class="df-bearing" value="" step="0.1" placeholder="045.0" style="width:80px;"> °</label>
+          </div>
+          <div class="df-bearing-row controls" style="margin-bottom:6px;">
+            <label>Lat: <input type="number" class="df-lat" value="" step="0.0001" placeholder="29.9600" style="width:100px;"></label>
+            <label>Lon: <input type="number" class="df-lon" value="" step="0.0001" placeholder="-90.0800" style="width:100px;"></label>
+            <label>Bearing: <input type="number" class="df-bearing" value="" step="0.1" placeholder="135.0" style="width:80px;"> °</label>
+          </div>
+        </div>
+        <div class="controls" style="margin-top:8px;">
+          <button id="btn-add-bearing" class="btn">+ Add Bearing</button>
+          <button id="btn-use-gps" class="btn">Use Current GPS</button>
+          <button id="btn-solve-df" class="btn btn-green">Solve</button>
+        </div>
+      </div>
+      <div id="df-result" class="card" style="display:none;">
+        <h3>Estimated TX Location</h3>
+        <div id="df-result-detail"></div>
+      </div>
+    </section>
+
+    <!-- FISSURE -->
+    <section id="tab-fissure" class="tab-panel">
+      <div class="panel-header">
+        <h2>FISSURE Protocol DB</h2>
+        <span id="fissure-status-badge" class="badge off">CHECKING</span>
+      </div>
+      <div class="card" style="margin-bottom:12px;">
+        <h3>Protocol Search</h3>
+        <div class="controls" style="margin-top:8px;">
+          <label>Freq: <input type="number" id="fissure-freq" value="433.92" step="0.01"> MHz</label>
+          <label>Modulation: <input type="text" id="fissure-mod" placeholder="OOK, FSK..." style="width:100px;padding:4px 6px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:12px;"></label>
+          <button id="btn-fissure-query" class="btn btn-green">Search</button>
+          <button id="btn-fissure-launch" class="btn">Launch FISSURE GUI</button>
+        </div>
+      </div>
+      <div id="fissure-results" class="list"><p class="placeholder">Enter a frequency to search protocols</p></div>
+    </section>
+
     <!-- Map -->
     <section id="tab-map" class="tab-panel">
       <div class="panel-header">
@@ -124,10 +209,58 @@
         <span id="tx-master" class="badge off">TX DISABLED</span>
       </div>
       <div class="tx-warning">
-        ⚠ All transmissions are safety-gated: frequency whitelist, power cap (30 dB), duration limit (30s), full audit log.
+        ⚠ <strong>LEGAL WARNING:</strong> Unauthorized RF transmission is a federal crime.
+        TX is disabled by default. All transmissions are safety-gated and audit-logged.
+        See <a href="https://github.com/kamakauzy/Recon-Raven/blob/main/LEGAL.md" style="color:var(--yellow);">LEGAL.md</a>.
       </div>
-      <div id="tx-controls" class="controls-grid">
-        <p class="placeholder">TX controls available in Phase 6</p>
+      <div class="card" style="margin-bottom:12px;">
+        <h3>Safety Status</h3>
+        <div id="tx-safety-status" style="font-size:13px; margin-top:8px;">
+          <div>Master Enable: <span id="tx-enabled" class="badge off">OFF</span></div>
+          <div style="margin-top:6px;">Max Gain: <span id="tx-max-gain">30</span> dB &bull; Max Duration: <span id="tx-max-dur">30</span>s</div>
+          <div id="tx-bands" style="margin-top:6px; font-size:12px; color:var(--text-dim);">Authorized bands: loading...</div>
+        </div>
+        <div class="controls" style="margin-top:12px;">
+          <button id="btn-tx-enable" class="btn btn-green">Enable TX</button>
+          <button id="btn-tx-disable" class="btn btn-red">Disable TX</button>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:12px;">
+        <h3>Transmit</h3>
+        <div class="controls" style="margin-top:8px; flex-wrap:wrap;">
+          <label>Freq: <input type="number" id="tx-freq" value="146.52" step="0.01"> MHz</label>
+          <label>Gain: <input type="range" id="tx-gain" min="0" max="30" value="10"><span id="tx-gain-val">10</span> dB</label>
+          <label>Duration: <input type="number" id="tx-dur" value="5" min="1" max="30" step="1"> s</label>
+          <label>Type: <select id="tx-type">
+            <option value="cw">CW Tone</option>
+            <option value="fm">FM Tone</option>
+            <option value="sweep">Sweep</option>
+            <option value="replay">IQ Replay</option>
+          </select></label>
+          <button id="btn-tx-transmit" class="btn btn-green" disabled>Transmit</button>
+          <button id="btn-tx-stop" class="btn btn-red">Emergency Stop</button>
+        </div>
+        <div id="tx-result" class="status-bar" style="margin-top:8px; display:none;"></div>
+      </div>
+      <div class="card">
+        <h3>Audit Log</h3>
+        <div id="tx-audit" class="list"><p class="placeholder">No transmissions recorded</p></div>
+      </div>
+    </section>
+
+    <!-- Federation -->
+    <section id="tab-federation" class="tab-panel">
+      <div class="panel-header">
+        <h2>Federation Mesh</h2>
+        <span id="fed-status-badge" class="badge off">CHECKING</span>
+      </div>
+      <div class="card" style="margin-bottom:12px;">
+        <h3>Local Node</h3>
+        <div id="fed-local" style="font-size:13px;">Loading...</div>
+      </div>
+      <div class="card">
+        <h3>Discovered Peers</h3>
+        <div id="fed-peers" class="list"><p class="placeholder">No peers discovered</p></div>
       </div>
     </section>
   </main>

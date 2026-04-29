@@ -300,6 +300,335 @@
     }
   });
 
+  // ── Classifier ──────────────────────────────────────────
+  async function loadClassifierRules() {
+    try {
+      const rules = await api('/classifier/rules');
+      const el = document.getElementById('classifier-rules');
+      el.innerHTML = '';
+      if (!rules.length) {
+        el.innerHTML = '<p class="placeholder">No rules loaded</p>';
+        return;
+      }
+      rules.forEach(r => {
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        item.innerHTML = `
+          <span><strong>${r.name}</strong> — ${r.description || ''}</span>
+          <span style="font-size:11px;color:var(--text-dim)">Priority: ${r.priority} &bull; Models: ${(r.models || []).length}</span>
+        `;
+        el.appendChild(item);
+      });
+    } catch (e) {
+      console.error('Failed to load classifier rules:', e);
+    }
+  }
+
+  document.getElementById('btn-classify').addEventListener('click', async () => {
+    const resultEl = document.getElementById('cls-result');
+    try {
+      const result = await api('/classifier/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          freq_mhz: parseFloat(document.getElementById('cls-freq').value),
+          duration_ms: parseFloat(document.getElementById('cls-duration').value),
+          modulation: document.getElementById('cls-mod').value,
+          model: document.getElementById('cls-model').value,
+        }),
+      });
+      resultEl.style.display = 'block';
+      if (result.label && result.label !== 'Unknown') {
+        resultEl.style.color = 'var(--green)';
+        resultEl.textContent = `✓ ${result.label} (${(result.confidence * 100).toFixed(0)}% confidence) — Rule: ${result.rule || 'ML'}`;
+      } else {
+        resultEl.style.color = 'var(--yellow)';
+        resultEl.textContent = '? Unknown — no matching rule';
+      }
+    } catch (e) {
+      resultEl.style.display = 'block';
+      resultEl.style.color = 'var(--red)';
+      resultEl.textContent = 'Error: ' + e.message;
+    }
+  });
+
+  // ── Direction Finding ───────────────────────────────────
+  document.getElementById('btn-add-bearing').addEventListener('click', () => {
+    const container = document.getElementById('df-bearings');
+    const row = document.createElement('div');
+    row.className = 'df-bearing-row controls';
+    row.style.marginBottom = '6px';
+    row.innerHTML = `
+      <label>Lat: <input type="number" class="df-lat" step="0.0001" style="width:100px;"></label>
+      <label>Lon: <input type="number" class="df-lon" step="0.0001" style="width:100px;"></label>
+      <label>Bearing: <input type="number" class="df-bearing" step="0.1" style="width:80px;"> °</label>
+      <button class="btn btn-red" style="padding:2px 8px;" onclick="this.parentElement.remove()">×</button>
+    `;
+    container.appendChild(row);
+  });
+
+  document.getElementById('btn-use-gps').addEventListener('click', async () => {
+    try {
+      const gps = await api('/gps/current');
+      if (gps.has_fix) {
+        const rows = document.querySelectorAll('.df-bearing-row');
+        const last = rows[rows.length - 1];
+        if (last) {
+          last.querySelector('.df-lat').value = gps.latitude.toFixed(6);
+          last.querySelector('.df-lon').value = gps.longitude.toFixed(6);
+        }
+      } else {
+        alert('No GPS fix available');
+      }
+    } catch (e) {
+      alert('GPS error: ' + e.message);
+    }
+  });
+
+  document.getElementById('btn-solve-df').addEventListener('click', async () => {
+    const rows = document.querySelectorAll('.df-bearing-row');
+    const measurements = [];
+    rows.forEach(row => {
+      const lat = parseFloat(row.querySelector('.df-lat').value);
+      const lon = parseFloat(row.querySelector('.df-lon').value);
+      const bearing = parseFloat(row.querySelector('.df-bearing').value);
+      if (!isNaN(lat) && !isNaN(lon) && !isNaN(bearing)) {
+        measurements.push({ latitude: lat, longitude: lon, bearing_deg: bearing });
+      }
+    });
+
+    if (measurements.length < 2) {
+      alert('Need at least 2 bearings with valid lat/lon');
+      return;
+    }
+
+    try {
+      const result = await api('/df/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ measurements }),
+      });
+      const el = document.getElementById('df-result');
+      el.style.display = 'block';
+      document.getElementById('df-result-detail').innerHTML = `
+        <div style="font-size:14px; margin-bottom:8px;">
+          <strong style="color:var(--green);">📍 ${result.latitude.toFixed(6)}, ${result.longitude.toFixed(6)}</strong>
+        </div>
+        <div style="font-size:12px; color:var(--text-dim);">
+          CEP: ${result.cep_m}m &bull; Bearings: ${result.num_bearings} &bull; Residual: ${result.residual}
+        </div>
+        <div style="margin-top:8px;">
+          <a href="https://www.google.com/maps?q=${result.latitude},${result.longitude}" target="_blank"
+             style="color:var(--accent); font-size:12px;">Open in Google Maps ↗</a>
+        </div>
+      `;
+    } catch (e) {
+      alert('DF solve error: ' + e.message);
+    }
+  });
+
+  // ── FISSURE ─────────────────────────────────────────────
+  async function loadFissureStatus() {
+    try {
+      const status = await api('/fissure/status');
+      const badge = document.getElementById('fissure-status-badge');
+      if (status.available) {
+        badge.textContent = `${status.protocol_count} PROTOCOLS`;
+        badge.className = 'badge live';
+      } else {
+        badge.textContent = 'NOT INSTALLED';
+        badge.className = 'badge off';
+      }
+    } catch (e) {
+      document.getElementById('fissure-status-badge').textContent = 'ERROR';
+    }
+  }
+
+  document.getElementById('btn-fissure-query').addEventListener('click', async () => {
+    const freq = parseFloat(document.getElementById('fissure-freq').value);
+    const mod = document.getElementById('fissure-mod').value;
+    try {
+      const results = await api(`/fissure/protocols/query?freq=${freq}&modulation=${encodeURIComponent(mod)}`);
+      const el = document.getElementById('fissure-results');
+      el.innerHTML = '';
+      if (!results.length) {
+        el.innerHTML = '<p class="placeholder">No matching protocols found</p>';
+        return;
+      }
+      results.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        item.style.flexDirection = 'column';
+        item.style.alignItems = 'flex-start';
+        item.innerHTML = `
+          <div><strong>${p.protocol || p.name || 'Unknown'}</strong></div>
+          <div style="font-size:11px;color:var(--text-dim);">
+            ${p.modulation || ''} &bull; ${p.frequency || p.freq || ''} MHz
+            ${p.bandwidth ? '&bull; BW: ' + p.bandwidth : ''}
+          </div>
+        `;
+        el.appendChild(item);
+      });
+    } catch (e) {
+      document.getElementById('fissure-results').innerHTML =
+        '<p class="placeholder" style="color:var(--red);">Query failed: ' + e.message + '</p>';
+    }
+  });
+
+  document.getElementById('btn-fissure-launch').addEventListener('click', async () => {
+    try {
+      await api('/fissure/launch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ freq_mhz: parseFloat(document.getElementById('fissure-freq').value) }),
+      });
+    } catch (e) {
+      alert('FISSURE launch error: ' + e.message);
+    }
+  });
+
+  // ── TX ──────────────────────────────────────────────────
+  async function loadTXStatus() {
+    try {
+      const status = await api('/tx/status');
+      const masterBadge = document.getElementById('tx-master');
+      const enabledBadge = document.getElementById('tx-enabled');
+      const transmitBtn = document.getElementById('btn-tx-transmit');
+
+      if (status.enabled) {
+        masterBadge.textContent = 'TX ENABLED';
+        masterBadge.className = 'badge live';
+        enabledBadge.textContent = 'ON';
+        enabledBadge.className = 'badge live';
+        transmitBtn.disabled = false;
+      } else {
+        masterBadge.textContent = 'TX DISABLED';
+        masterBadge.className = 'badge off';
+        enabledBadge.textContent = 'OFF';
+        enabledBadge.className = 'badge off';
+        transmitBtn.disabled = true;
+      }
+
+      document.getElementById('tx-max-gain').textContent = status.max_gain_db || 30;
+      document.getElementById('tx-max-dur').textContent = status.max_duration_s || 30;
+
+      if (status.authorized_bands) {
+        document.getElementById('tx-bands').textContent = 'Authorized bands: ' +
+          status.authorized_bands.map(b => `${b.low_mhz}–${b.high_mhz} MHz`).join(', ');
+      }
+    } catch (e) {
+      console.error('TX status error:', e);
+    }
+  }
+
+  document.getElementById('tx-gain').addEventListener('input', (e) => {
+    document.getElementById('tx-gain-val').textContent = e.target.value;
+  });
+
+  document.getElementById('btn-tx-enable').addEventListener('click', async () => {
+    if (!confirm('⚠️ LEGAL WARNING: Enabling TX allows RF transmission. Unauthorized transmission is a federal crime. Continue?')) return;
+    try {
+      await api('/tx/enable', { method: 'POST' });
+      await loadTXStatus();
+    } catch (e) { alert('TX enable error: ' + e.message); }
+  });
+
+  document.getElementById('btn-tx-disable').addEventListener('click', async () => {
+    try {
+      await api('/tx/disable', { method: 'POST' });
+      await loadTXStatus();
+    } catch (e) { alert('TX disable error: ' + e.message); }
+  });
+
+  document.getElementById('btn-tx-transmit').addEventListener('click', async () => {
+    const freq = parseFloat(document.getElementById('tx-freq').value);
+    const gain = parseInt(document.getElementById('tx-gain').value);
+    const dur = parseInt(document.getElementById('tx-dur').value);
+    const txType = document.getElementById('tx-type').value;
+
+    if (!confirm(`Transmit ${txType} on ${freq} MHz at ${gain} dB for ${dur}s?`)) return;
+
+    const resultEl = document.getElementById('tx-result');
+    try {
+      const result = await api('/tx/transmit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          freq_mhz: freq,
+          gain_db: gain,
+          duration_s: dur,
+          tx_type: txType,
+        }),
+      });
+      resultEl.style.display = 'block';
+      resultEl.style.color = 'var(--green)';
+      resultEl.textContent = `✓ TX started: ${txType} on ${freq} MHz`;
+    } catch (e) {
+      resultEl.style.display = 'block';
+      resultEl.style.color = 'var(--red)';
+      resultEl.textContent = '✗ ' + e.message;
+    }
+  });
+
+  document.getElementById('btn-tx-stop').addEventListener('click', async () => {
+    try {
+      await api('/tx/stop', { method: 'POST' });
+      document.getElementById('tx-result').style.display = 'block';
+      document.getElementById('tx-result').style.color = 'var(--yellow)';
+      document.getElementById('tx-result').textContent = 'TX stopped';
+    } catch (e) { alert('TX stop error: ' + e.message); }
+  });
+
+  // ── Federation ──────────────────────────────────────────
+  async function loadFederationStatus() {
+    try {
+      const status = await api('/federation/status');
+      const badge = document.getElementById('fed-status-badge');
+
+      if (status.running) {
+        badge.textContent = `${status.peer_count} PEERS`;
+        badge.className = 'badge live';
+      } else if (status.enabled) {
+        badge.textContent = 'STARTING';
+        badge.className = 'badge off';
+      } else {
+        badge.textContent = 'DISABLED';
+        badge.className = 'badge off';
+      }
+
+      document.getElementById('fed-local').innerHTML = `
+        <div>Node ID: <strong>${status.node_id}</strong></div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:4px;">
+          Multicast: ${status.multicast_group}:${status.multicast_port} &bull;
+          Peers: ${status.peer_count}
+        </div>
+      `;
+
+      // Load peers
+      const peers = await api('/federation/peers');
+      const el = document.getElementById('fed-peers');
+      el.innerHTML = '';
+      if (!peers.length) {
+        el.innerHTML = '<p class="placeholder">No peers discovered — enable federation in config.yml</p>';
+        return;
+      }
+      peers.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        item.innerHTML = `
+          <span><strong>${p.node_id}</strong> — ${p.host}:${p.port}</span>
+          <span style="font-size:11px;">
+            ${p.alive ? '<span style="color:var(--green)">●</span> alive' : '<span style="color:var(--red)">●</span> stale'}
+            &bull; v${p.version} &bull; ${p.device_count} SDR(s)
+          </span>
+        `;
+        el.appendChild(item);
+      });
+    } catch (e) {
+      console.error('Federation status error:', e);
+    }
+  }
+
   // ── Init ────────────────────────────────────────────────
   async function init() {
     await loadDevices();
@@ -307,6 +636,10 @@
     await loadEventHistory();
     await loadBaselines();
     await loadReports();
+    await loadClassifierRules();
+    await loadTXStatus();
+    await loadFissureStatus();
+    await loadFederationStatus();
 
     // WebSocket connections
     wsAlerts = connectWS('/ws/alerts', (msg) => {
@@ -317,8 +650,10 @@
       if (msg.type === 'device_status') loadDevices();
     });
 
-    // Periodic GPS refresh
+    // Periodic refreshes
     setInterval(loadGPS, 5000);
+    setInterval(loadTXStatus, 10000);
+    setInterval(loadFederationStatus, 15000);
   }
 
   // PWA install prompt

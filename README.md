@@ -1,8 +1,39 @@
 # Recon-Raven
 
+> **⚠️ LEGAL WARNING:** This software includes RF transmission capabilities.
+> Unauthorized transmission violates FCC Part 97/15 (US), the Wireless Telegraphy Act (UK),
+> and equivalent laws globally. **TX is DISABLED by default** and requires explicit ROE
+> approval. Misuse carries federal criminal penalties. See [LEGAL.md](LEGAL.md).
+> **For authorized training use only.**
+
 **F3EAD-aligned SIGINT automation platform** — multi-SDR orchestration, real-time spectrum dashboard, signal classification, direction finding, HackRF TX with safety gates, FISSURE integration, and peer-to-peer federation.
 
 Built for DragonOS on field-deployable Linux boxes with RTL-SDR and HackRF hardware.
+
+---
+
+## F3EAD Course Integration
+
+Recon-Raven automates the [F3EAD cycle](reference/f3ead-cycle.md) for civilian SIGINT training. Each platform feature maps directly to a phase of the intelligence process:
+
+| F3EAD Phase | Raven Feature | What It Does | Reference |
+|-------------|---------------|--------------|-----------|
+| **FIND** | Baseline + Signal Alerter | Scheduled rtl_433 baselines, automatic anomaly detection against known environment | [field-checklist.md](reference/field-checklist.md) |
+| **FIX** | DF Solver | Weighted least-squares triangulation from 2+ bearing measurements, CEP estimation | [direction-finding.md](reference/direction-finding.md) |
+| **FINISH** | TX Service (OPFOR only) | HackRF deception inject / DF calibration tone — 5 safety gates, RX-only by default | [LEGAL.md](LEGAL.md) |
+| **EXPLOIT** | FISSURE + Classifier | Protocol identification, modulation detection, demod flowgraph lookup | [signal-types.md](reference/signal-types.md) |
+| **ANALYZE** | Classifier + Baseline Diff | Rule-based + ML classification, automatic diff reports, trend detection | [f3ead-cycle.md](reference/f3ead-cycle.md) |
+| **DISSEMINATE** | Intel Packager + Federation | One-page markdown reports, push notifications, peer-to-peer event sharing | [signal-log template](templates/signal-log.md) |
+
+### Course Day Mapping
+
+| Day | Focus | Raven Features Used |
+|-----|-------|---------------------|
+| **1** | Fundamentals — SDR setup, spectrum basics | Device enumeration, waterfall display, GPS |
+| **2** | Collection — baselines, signal identification | Baseline capture, signal alerter, classifier rules |
+| **3** | DF & Location — triangulation techniques | DF solver, tactical map with bearing overlay |
+| **4** | Team Ops — LP/OP coordination, deception | Federation mesh, TX (OPFOR), push alerts |
+| **5** | Full Cycle — end-to-end F3EAD exercise | All features, intel report generation, debrief |
 
 ---
 
