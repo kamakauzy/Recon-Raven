@@ -1,0 +1,544 @@
+options:
+  parameters:
+    author: sigint-field-kit
+    catch_exceptions: 'True'
+    category: '[GRC Hier Blocks]'
+    comment: 'Four-band simultaneous monitor: VHF voice (146 MHz),
+
+      ISM sensors (433.92 MHz), UHF FRS/GMRS (462 MHz),
+
+      LoRa/Meshtastic (915 MHz). Four waterfalls + FFTs
+
+      stacked vertically for one-glance situational awareness.
+
+      Requires 4 RTL-SDR dongles (one per band) OR run
+
+      sequentially with band switching.
+
+      For single-dongle use: set unused sources to disabled
+
+      and use the active band slider.'
+    copyright: Unlicense
+    description: Quad-band tactical SIGINT monitor
+    gen_cmake: 'On'
+    gen_linking: dynamic
+    generate_options: qt_gui
+    hier_block_src_path: '.:'
+    id: quad_band_monitor
+    max_nouts: '0'
+    output_language: python
+    placement: (0,0)
+    qt_qss_theme: ''
+    realtime_scheduling: ''
+    run: 'True'
+    run_command: '{python} -u {filename}'
+    run_options: prompt
+    sizing_mode: fixed
+    thread_safe_setters: ''
+    title: Quad-Band Tactical Monitor
+    window_size: (1280,1024)
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [8, 8]
+    rotation: 0
+    state: enabled
+
+blocks:
+- name: samp_rate
+  id: variable
+  parameters:
+    comment: ''
+    value: '2400000'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [8, 100]
+    rotation: 0
+    state: enabled
+
+- name: gain_all
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: 0,0,1,1
+    label: RF Gain (all bands)
+    min_len: '100'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '0'
+    step: '1'
+    stop: '49'
+    value: '38'
+    widget: counter_slider
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [200, 100]
+    rotation: 0
+    state: enabled
+
+# ── Band 1: VHF Voice 146 MHz ──
+
+- name: freq_vhf
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: 0,1,1,1
+    label: VHF (MHz)
+    min_len: '100'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '140'
+    step: '0.005'
+    stop: '174'
+    value: '146.52'
+    widget: counter_slider
+  states:
+    coordinate: [400, 100]
+    rotation: 0
+    state: enabled
+
+- name: src_vhf
+  id: osmosdr_source
+  parameters:
+    args: '"rtl=0"'
+    nchan: '1'
+    sample_rate: samp_rate
+    freq0: freq_vhf * 1e6
+    gain0: gain_all
+    if_gain0: '20'
+    bb_gain0: '20'
+    ant0: ''
+    bw0: '0'
+    corr0: '0'
+    dc_offset_mode0: '0'
+    iq_balance_mode0: '0'
+    type: fc32
+    num_mboards: '1'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    coordinate: [48, 260]
+    rotation: 0
+    state: enabled
+
+- name: wf_vhf
+  id: qtgui_waterfall_sink_x
+  parameters:
+    bw: samp_rate
+    fc: freq_vhf * 1e6
+    fftsize: '1024'
+    freqhalf: 'True'
+    gui_hint: 1,0,1,2
+    int_max: '10'
+    int_min: '-120'
+    name: '"VHF 146 MHz"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.10'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'True'
+    axislabels: 'True'
+    grid: 'True'
+    color1: '0'
+    alpha1: '1.0'
+  states:
+    coordinate: [360, 260]
+    rotation: 0
+    state: enabled
+
+- name: fft_vhf
+  id: qtgui_freq_sink_x
+  parameters:
+    bw: samp_rate
+    fc: freq_vhf * 1e6
+    fftsize: '1024'
+    freqhalf: 'True'
+    gui_hint: 1,2,1,2
+    name: '"VHF Spectrum"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.10'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    ymin: '-120'
+    ymax: '10'
+    autoscale: 'False'
+    average: '1.0'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'False'
+    axislabels: 'True'
+    grid: 'True'
+    ctrlpanel: 'False'
+    label: Relative Gain
+    units: dB
+    color1: '"blue"'
+    width1: '1'
+    alpha1: '1.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_level: '0.0'
+    tr_chan: '0'
+    tr_tag: '""'
+    norm_window: 'False'
+  states:
+    coordinate: [360, 420]
+    rotation: 0
+    state: enabled
+
+# ── Band 2: ISM 433 MHz ──
+
+- name: freq_ism
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: 0,2,1,1
+    label: ISM (MHz)
+    min_len: '100'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '420'
+    step: '0.01'
+    stop: '450'
+    value: '433.92'
+    widget: counter_slider
+  states:
+    coordinate: [600, 100]
+    rotation: 0
+    state: enabled
+
+- name: src_ism
+  id: osmosdr_source
+  parameters:
+    args: '"rtl=1"'
+    nchan: '1'
+    sample_rate: samp_rate
+    freq0: freq_ism * 1e6
+    gain0: gain_all
+    if_gain0: '20'
+    bb_gain0: '20'
+    ant0: ''
+    bw0: '0'
+    corr0: '0'
+    dc_offset_mode0: '0'
+    iq_balance_mode0: '0'
+    type: fc32
+    num_mboards: '1'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    coordinate: [48, 580]
+    rotation: 0
+    state: enabled
+
+- name: wf_ism
+  id: qtgui_waterfall_sink_x
+  parameters:
+    bw: samp_rate
+    fc: freq_ism * 1e6
+    fftsize: '1024'
+    freqhalf: 'True'
+    gui_hint: 2,0,1,2
+    int_max: '10'
+    int_min: '-120'
+    name: '"ISM 433 MHz"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.10'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'True'
+    axislabels: 'True'
+    grid: 'True'
+    color1: '0'
+    alpha1: '1.0'
+  states:
+    coordinate: [360, 580]
+    rotation: 0
+    state: enabled
+
+- name: fft_ism
+  id: qtgui_freq_sink_x
+  parameters:
+    bw: samp_rate
+    fc: freq_ism * 1e6
+    fftsize: '1024'
+    freqhalf: 'True'
+    gui_hint: 2,2,1,2
+    name: '"ISM Spectrum"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.10'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    ymin: '-120'
+    ymax: '10'
+    autoscale: 'False'
+    average: '1.0'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'False'
+    axislabels: 'True'
+    grid: 'True'
+    ctrlpanel: 'False'
+    label: Relative Gain
+    units: dB
+    color1: '"green"'
+    width1: '1'
+    alpha1: '1.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_level: '0.0'
+    tr_chan: '0'
+    tr_tag: '""'
+    norm_window: 'False'
+  states:
+    coordinate: [360, 740]
+    rotation: 0
+    state: enabled
+
+# ── Band 3: UHF FRS/GMRS 462 MHz ──
+
+- name: freq_uhf
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: 0,3,1,1
+    label: UHF (MHz)
+    min_len: '100'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '450'
+    step: '0.00625'
+    stop: '470'
+    value: '462.5625'
+    widget: counter_slider
+  states:
+    coordinate: [800, 100]
+    rotation: 0
+    state: enabled
+
+- name: src_uhf
+  id: osmosdr_source
+  parameters:
+    args: '"rtl=2"'
+    nchan: '1'
+    sample_rate: samp_rate
+    freq0: freq_uhf * 1e6
+    gain0: gain_all
+    if_gain0: '20'
+    bb_gain0: '20'
+    ant0: ''
+    bw0: '0'
+    corr0: '0'
+    dc_offset_mode0: '0'
+    iq_balance_mode0: '0'
+    type: fc32
+    num_mboards: '1'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    coordinate: [48, 900]
+    rotation: 0
+    state: enabled
+
+- name: wf_uhf
+  id: qtgui_waterfall_sink_x
+  parameters:
+    bw: samp_rate
+    fc: freq_uhf * 1e6
+    fftsize: '1024'
+    freqhalf: 'True'
+    gui_hint: 3,0,1,2
+    int_max: '10'
+    int_min: '-120'
+    name: '"UHF 462 MHz"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.10'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'True'
+    axislabels: 'True'
+    grid: 'True'
+    color1: '0'
+    alpha1: '1.0'
+  states:
+    coordinate: [360, 900]
+    rotation: 0
+    state: enabled
+
+- name: fft_uhf
+  id: qtgui_freq_sink_x
+  parameters:
+    bw: samp_rate
+    fc: freq_uhf * 1e6
+    fftsize: '1024'
+    freqhalf: 'True'
+    gui_hint: 3,2,1,2
+    name: '"UHF Spectrum"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.10'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    ymin: '-120'
+    ymax: '10'
+    autoscale: 'False'
+    average: '1.0'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'False'
+    axislabels: 'True'
+    grid: 'True'
+    ctrlpanel: 'False'
+    label: Relative Gain
+    units: dB
+    color1: '"red"'
+    width1: '1'
+    alpha1: '1.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_level: '0.0'
+    tr_chan: '0'
+    tr_tag: '""'
+    norm_window: 'False'
+  states:
+    coordinate: [360, 1060]
+    rotation: 0
+    state: enabled
+
+# ── Band 4: LoRa 915 MHz ──
+
+- name: freq_lora
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: 5,0,1,1
+    label: LoRa (MHz)
+    min_len: '100'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '900'
+    step: '0.1'
+    stop: '930'
+    value: '915'
+    widget: counter_slider
+  states:
+    coordinate: [200, 1200]
+    rotation: 0
+    state: enabled
+
+- name: src_lora
+  id: osmosdr_source
+  parameters:
+    args: '"rtl=3"'
+    nchan: '1'
+    sample_rate: samp_rate
+    freq0: freq_lora * 1e6
+    gain0: gain_all
+    if_gain0: '20'
+    bb_gain0: '20'
+    ant0: ''
+    bw0: '0'
+    corr0: '0'
+    dc_offset_mode0: '0'
+    iq_balance_mode0: '0'
+    type: fc32
+    num_mboards: '1'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    coordinate: [48, 1220]
+    rotation: 0
+    state: enabled
+
+- name: wf_lora
+  id: qtgui_waterfall_sink_x
+  parameters:
+    bw: samp_rate
+    fc: freq_lora * 1e6
+    fftsize: '1024'
+    freqhalf: 'True'
+    gui_hint: 4,0,1,2
+    int_max: '10'
+    int_min: '-120'
+    name: '"LoRa 915 MHz"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.10'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'True'
+    axislabels: 'True'
+    grid: 'True'
+    color1: '0'
+    alpha1: '1.0'
+  states:
+    coordinate: [360, 1220]
+    rotation: 0
+    state: enabled
+
+- name: fft_lora
+  id: qtgui_freq_sink_x
+  parameters:
+    bw: samp_rate
+    fc: freq_lora * 1e6
+    fftsize: '1024'
+    freqhalf: 'True'
+    gui_hint: 4,2,1,2
+    name: '"LoRa Spectrum"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.10'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    ymin: '-120'
+    ymax: '10'
+    autoscale: 'False'
+    average: '1.0'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'False'
+    axislabels: 'True'
+    grid: 'True'
+    ctrlpanel: 'False'
+    label: Relative Gain
+    units: dB
+    color1: '"magenta"'
+    width1: '1'
+    alpha1: '1.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_level: '0.0'
+    tr_chan: '0'
+    tr_tag: '""'
+    norm_window: 'False'
+  states:
+    coordinate: [360, 1380]
+    rotation: 0
+    state: enabled
+
+connections:
+- [src_vhf, '0', wf_vhf, '0']
+- [src_vhf, '0', fft_vhf, '0']
+- [src_ism, '0', wf_ism, '0']
+- [src_ism, '0', fft_ism, '0']
+- [src_uhf, '0', wf_uhf, '0']
+- [src_uhf, '0', fft_uhf, '0']
+- [src_lora, '0', wf_lora, '0']
+- [src_lora, '0', fft_lora, '0']
+
+metadata:
+  file_format: 1
+  grc_version: 3.10.0.0

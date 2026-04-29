@@ -1,0 +1,42 @@
+# Recon-Raven
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Data (runtime)
+*.db
+*.db-wal
+*.db-shm
+/data/
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+config.yml
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Captures and logs (runtime data, not source)
+captures/
+recordings/
+logs/*.csv
+reports/*.md
+
+# ML models (too large for git)
+backend/classifier/models/*.pkl
+backend/classifier/models/*.onnx

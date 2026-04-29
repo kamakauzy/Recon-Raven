@@ -1,0 +1,13 @@
+{
+  "name": "mcp-raven",
+  "version": "0.1.0",
+  "description": "MCP server for Recon-Raven SIGINT platform",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  }
+}

@@ -1,0 +1,379 @@
+options:
+  parameters:
+    author: sigint-field-kit
+    catch_exceptions: 'True'
+    category: '[GRC Hier Blocks]'
+    comment: 'NBFM channel scanner for FRS, GMRS, MURS, and common
+
+      Baofeng frequencies. Stops on active channels when
+
+      signal exceeds squelch threshold. Audio output + waterfall.
+
+      Single RTL-SDR dongle — wide enough BW to cover
+
+      FRS/GMRS simultaneously (462-467 MHz).
+
+      Requires: RTL-SDR, audio output device.'
+    copyright: Unlicense
+    description: NBFM channel scanner for FRS/GMRS/MURS voice monitoring
+    gen_cmake: 'On'
+    gen_linking: dynamic
+    generate_options: qt_gui
+    hier_block_src_path: '.:'
+    id: nbfm_scanner
+    max_nouts: '0'
+    output_language: python
+    placement: (0,0)
+    qt_qss_theme: ''
+    realtime_scheduling: ''
+    run: 'True'
+    run_command: '{python} -u {filename}'
+    run_options: prompt
+    sizing_mode: fixed
+    thread_safe_setters: ''
+    title: NBFM Voice Channel Scanner
+    window_size: (1200,800)
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [8, 8]
+    rotation: 0
+    state: enabled
+
+blocks:
+- name: samp_rate
+  id: variable
+  parameters:
+    comment: ''
+    value: '2400000'
+  states:
+    coordinate: [8, 100]
+    rotation: 0
+    state: enabled
+
+- name: channel_freq
+  id: variable_qtgui_chooser
+  parameters:
+    comment: ''
+    gui_hint: 0,0,1,2
+    label: Channel
+    label0: 'FRS 1 (462.5625)'
+    label1: 'FRS 2 (462.5875)'
+    label2: 'FRS 3 (462.6125)'
+    label3: 'FRS 4 (462.6375)'
+    label4: 'FRS 5 (462.6625)'
+    label5: 'FRS 6 (462.6875)'
+    label6: 'FRS 7 (462.7125)'
+    label7: 'FRS 8 (467.5625)'
+    label8: 'GMRS 15 (462.550)'
+    label9: 'GMRS 16 (462.575)'
+    num_opts: '10'
+    option0: '462562500'
+    option1: '462587500'
+    option2: '462612500'
+    option3: '462637500'
+    option4: '462662500'
+    option5: '462687500'
+    option6: '462712500'
+    option7: '467562500'
+    option8: '462550000'
+    option9: '462575000'
+    type: int
+    value: '462562500'
+  states:
+    coordinate: [8, 200]
+    rotation: 0
+    state: enabled
+
+- name: center_freq
+  id: variable
+  parameters:
+    comment: 'Center of FRS/GMRS band — single dongle covers all channels'
+    value: '465000000'
+  states:
+    coordinate: [200, 100]
+    rotation: 0
+    state: enabled
+
+- name: rf_gain
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: 0,2,1,1
+    label: RF Gain
+    min_len: '100'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '0'
+    step: '1'
+    stop: '49'
+    value: '38'
+    widget: counter_slider
+  states:
+    coordinate: [400, 100]
+    rotation: 0
+    state: enabled
+
+- name: volume
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: 0,3,1,1
+    label: Volume
+    min_len: '100'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '0'
+    step: '0.05'
+    stop: '2.0'
+    value: '0.7'
+    widget: counter_slider
+  states:
+    coordinate: [600, 100]
+    rotation: 0
+    state: enabled
+
+- name: squelch_level
+  id: variable_qtgui_range
+  parameters:
+    comment: ''
+    gui_hint: 5,0,1,2
+    label: Squelch (dB)
+    min_len: '200'
+    orient: QtCore.Qt.Horizontal
+    rangeType: float
+    start: '-100'
+    step: '1'
+    stop: '0'
+    value: '-50'
+    widget: counter_slider
+  states:
+    coordinate: [400, 200]
+    rotation: 0
+    state: enabled
+
+# ── Source ──
+
+- name: rtlsdr_source
+  id: osmosdr_source
+  parameters:
+    args: ''
+    nchan: '1'
+    sample_rate: samp_rate
+    freq0: center_freq
+    gain0: rf_gain
+    if_gain0: '20'
+    bb_gain0: '20'
+    ant0: ''
+    bw0: '0'
+    corr0: '0'
+    dc_offset_mode0: '0'
+    iq_balance_mode0: '0'
+    type: fc32
+    num_mboards: '1'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    coordinate: [48, 400]
+    rotation: 0
+    state: enabled
+
+# ── Frequency translation (shift selected channel to baseband) ──
+
+- name: freq_xlat
+  id: freq_xlating_fir_filter_xxx
+  parameters:
+    center_freq: channel_freq - center_freq
+    comment: 'Shift selected channel to baseband'
+    decim: int(samp_rate / 48000)
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    samp_rate: samp_rate
+    taps: firdes.low_pass(1, samp_rate, 6250, 1000)
+    type: ccc
+  states:
+    coordinate: [320, 400]
+    rotation: 0
+    state: enabled
+
+# ── Squelch ──
+
+- name: pwr_squelch
+  id: analog_pwr_squelch_xx
+  parameters:
+    alpha: '1e-4'
+    comment: ''
+    gate: 'False'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    ramp: '0'
+    threshold: squelch_level
+    type: complex
+  states:
+    coordinate: [576, 400]
+    rotation: 0
+    state: enabled
+
+# ── NBFM demodulator ──
+
+- name: nbfm_demod
+  id: analog_nbfm_rx
+  parameters:
+    audio_rate: '48000'
+    comment: ''
+    max_dev: '5000'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    quad_rate: '48000'
+    tau: 75e-6
+  states:
+    coordinate: [784, 408]
+    rotation: 0
+    state: enabled
+
+# ── Volume control ──
+
+- name: vol_multiply
+  id: blocks_multiply_const_vxx
+  parameters:
+    comment: ''
+    const: volume
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    type: float
+    vlen: '1'
+  states:
+    coordinate: [976, 416]
+    rotation: 0
+    state: enabled
+
+# ── Audio output ──
+
+- name: audio_sink
+  id: audio_sink
+  parameters:
+    comment: ''
+    device_name: ''
+    num_inputs: '1'
+    ok_to_block: 'True'
+    samp_rate: '48000'
+  states:
+    coordinate: [1120, 416]
+    rotation: 0
+    state: enabled
+
+# ── Wideband waterfall (shows all channels) ──
+
+- name: wf_wide
+  id: qtgui_waterfall_sink_x
+  parameters:
+    bw: samp_rate
+    fc: center_freq
+    fftsize: '2048'
+    freqhalf: 'True'
+    gui_hint: 1,0,1,4
+    int_max: '0'
+    int_min: '-100'
+    name: '"FRS/GMRS Band Overview"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.05'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'True'
+    axislabels: 'True'
+    grid: 'True'
+    color1: '0'
+    alpha1: '1.0'
+  states:
+    coordinate: [320, 560]
+    rotation: 0
+    state: enabled
+
+# ── Wideband FFT ──
+
+- name: fft_wide
+  id: qtgui_freq_sink_x
+  parameters:
+    bw: samp_rate
+    fc: center_freq
+    fftsize: '2048'
+    freqhalf: 'True'
+    gui_hint: 2,0,1,4
+    name: '"FRS/GMRS Spectrum"'
+    nconnections: '1'
+    type: complex
+    update_time: '0.05'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    ymin: '-100'
+    ymax: '0'
+    autoscale: 'False'
+    average: '1.0'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    showports: 'False'
+    legend: 'True'
+    axislabels: 'True'
+    grid: 'True'
+    ctrlpanel: 'False'
+    label: Relative Gain
+    units: dB
+    color1: '"blue"'
+    width1: '1'
+    alpha1: '1.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_level: '0.0'
+    tr_chan: '0'
+    tr_tag: '""'
+    norm_window: 'False'
+  states:
+    coordinate: [320, 700]
+    rotation: 0
+    state: enabled
+
+# ── Demodulated audio scope (shows voice activity) ──
+
+- name: audio_scope
+  id: qtgui_time_sink_x
+  parameters:
+    autoscale: 'True'
+    comment: ''
+    gui_hint: 3,0,1,4
+    label1: Audio
+    name: '"Demodulated Audio"'
+    nconnections: '1'
+    size: '48000'
+    srate: '48000'
+    tr_chan: '0'
+    tr_delay: '0'
+    tr_level: '0.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_slope: qtgui.TRIG_SLOPE_POS
+    tr_tag: '""'
+    type: float
+    update_time: '0.10'
+    ylabel: Amplitude
+    ymax: '1'
+    ymin: '-1'
+    yunit: '""'
+  states:
+    coordinate: [976, 550]
+    rotation: 0
+    state: enabled
+
+connections:
+- [rtlsdr_source, '0', freq_xlat, '0']
+- [rtlsdr_source, '0', wf_wide, '0']
+- [rtlsdr_source, '0', fft_wide, '0']
+- [freq_xlat, '0', pwr_squelch, '0']
+- [pwr_squelch, '0', nbfm_demod, '0']
+- [nbfm_demod, '0', vol_multiply, '0']
+- [vol_multiply, '0', audio_sink, '0']
+- [vol_multiply, '0', audio_scope, '0']
+
+metadata:
+  file_format: 1
+  grc_version: 3.10.0.0

@@ -1,0 +1,64 @@
+# =============================================================
+#  Recon-Raven Configuration
+# =============================================================
+# Copy to config.yml and edit for your environment.
+# Environment variables override these values (prefix: RAVEN_)
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+data_dir: "/var/lib/recon-raven"
+db_path: "/var/lib/recon-raven/raven.db"
+
+# ── SDR Devices ──────────────────────────────────────────────
+devices:
+  health_check_interval: 60        # seconds between health checks
+  auto_enumerate: true             # enumerate SDRs on startup
+
+# ── GPS ──────────────────────────────────────────────────────
+gps:
+  enabled: true
+  host: "127.0.0.1"
+  port: 2947
+  poll_interval: 2                 # seconds
+
+# ── Scheduler ────────────────────────────────────────────────
+scheduler:
+  baseline_cron: "0 */6 * * *"     # every 6 hours
+  baseline_duration: 120           # seconds per baseline capture
+  baseline_frequencies:
+    - 433.92
+    - 315.0
+  auto_diff: true                  # diff against previous baseline
+  auto_report: true                # daily intel report at midnight
+  report_cron: "0 0 * * *"
+
+# ── Capture Defaults ─────────────────────────────────────────
+capture:
+  default_gain: 38
+  default_rate: 2.4                # Msps for GNU Radio scripts
+  output_dir: "/var/lib/recon-raven/captures"
+  log_dir: "/var/lib/recon-raven/logs"
+  baseline_dir: "/var/lib/recon-raven/baselines"
+  report_dir: "/var/lib/recon-raven/reports"
+
+# ── TX Safety ────────────────────────────────────────────────
+tx:
+  enabled: false                   # master TX enable (must be explicitly set true)
+  max_gain_db: 30                  # hardware max is 47, we cap at 30
+  max_duration_s: 30               # auto-kill TX after this
+  authorized_bands_mhz:            # TX only allowed in these ranges
+    - [144.0, 148.0]
+    - [420.0, 450.0]
+    - [902.0, 928.0]
+
+# ── FISSURE ──────────────────────────────────────────────────
+fissure:
+  install_path: "/home/kama/Tools/FISSURE"
+  enabled: true                    # set false if not installed
+
+# ── Classification ───────────────────────────────────────────
+classifier:
+  rules_dir: "classifier/rules"
+  ml_model_path: ""                # empty = rules-only mode
