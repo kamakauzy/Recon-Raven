@@ -96,10 +96,10 @@ class CaptureService:
         script = TASK_SCRIPTS[task.task_type]
         script_path = str(Path(self._engine_dir) / script)
 
+        # Use system python3 — GNU Radio + osmosdr are system packages
         cmd = [
-            "python3", script_path,
+            "/usr/bin/python3", script_path,
             "-f", str(task.freq_mhz),
-            "-d", str(task.sdr_index),
             "-g", str(kwargs.get("gain", self._config.default_gain)),
         ]
 
@@ -108,7 +108,7 @@ class CaptureService:
             log_file = os.path.join(
                 self._config.log_dir, f"bursts_{task.task_id}_{ts}.csv"
             )
-            cmd.extend(["--log", log_file, "--json-events"])
+            cmd.extend(["--log", log_file])
             task.log_file = log_file
 
         elif task.task_type == "squelch_record":
@@ -131,7 +131,6 @@ class CaptureService:
             )
             cmd.extend([
                 "--log", log_file,
-                "--json-events",
                 "--threshold", str(kwargs.get("threshold", -40)),
             ])
             task.log_file = log_file
