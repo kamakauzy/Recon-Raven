@@ -1,6 +1,7 @@
 """
 Capture Service — wraps engine scripts as managed async subprocesses.
 """
+
 import asyncio
 import json
 import logging
@@ -42,8 +43,15 @@ class CaptureTask:
 
 
 class CaptureService:
-    def __init__(self, engine_dir: str, device_manager, gps_poller, db_path: str,
-                 capture_config, classifier=None):
+    def __init__(
+        self,
+        engine_dir: str,
+        device_manager,
+        gps_poller,
+        db_path: str,
+        capture_config,
+        classifier=None,
+    ):
         self._engine_dir = engine_dir
         self._dm = device_manager
         self._gps = gps_poller
@@ -57,8 +65,14 @@ class CaptureService:
         """Set callback for real-time event broadcasting (WebSocket push)."""
         self._event_callback = cb
 
-    async def start_capture(self, task_type: str, sdr_index: int, freq_mhz: float,
-                            duration: int = 0, **kwargs) -> CaptureTask:
+    async def start_capture(
+        self,
+        task_type: str,
+        sdr_index: int,
+        freq_mhz: float,
+        duration: int = 0,
+        **kwargs,
+    ) -> CaptureTask:
         """Start a capture task on a specific SDR."""
         if task_type not in TASK_SCRIPTS:
             raise ValueError(f"Unknown task type: {task_type}")
@@ -87,12 +101,18 @@ class CaptureService:
             await self._start_engine_script(task, duration, ts, **kwargs)
 
         self._tasks[task_id] = task
-        logger.info("Started %s (id=%s) on SDR %d @ %.4f MHz",
-                     task_type, task_id, sdr_index, freq_mhz)
+        logger.info(
+            "Started %s (id=%s) on SDR %d @ %.4f MHz",
+            task_type,
+            task_id,
+            sdr_index,
+            freq_mhz,
+        )
         return task
 
-    async def _start_engine_script(self, task: CaptureTask, duration: int,
-                                    ts: str, **kwargs):
+    async def _start_engine_script(
+        self, task: CaptureTask, duration: int, ts: str, **kwargs
+    ):
         """Launch an engine script as a subprocess."""
         script = TASK_SCRIPTS[task.task_type]
         script_path = str(Path(self._engine_dir) / script)
@@ -101,22 +121,32 @@ class CaptureService:
         # power_sweep (power_logger) uses different args than GNU Radio scripts
         if task.task_type == "power_sweep":
             cmd = [
-                "/usr/bin/python3", script_path,
-                "-l", str(kwargs.get("freq_low", task.freq_mhz - 5)),
-                "-u", str(kwargs.get("freq_high", task.freq_mhz + 5)),
-                "-g", str(kwargs.get("gain", self._config.default_gain)),
-                "-o", self._config.log_dir,
-                "--device", str(task.sdr_index),
+                "/usr/bin/python3",
+                script_path,
+                "-l",
+                str(kwargs.get("freq_low", task.freq_mhz - 5)),
+                "-u",
+                str(kwargs.get("freq_high", task.freq_mhz + 5)),
+                "-g",
+                str(kwargs.get("gain", self._config.default_gain)),
+                "-o",
+                self._config.log_dir,
+                "--device",
+                str(task.sdr_index),
                 "--json-events",
             ]
             if duration > 0:
                 cmd.extend(["--duration", str(duration)])
         else:
             cmd = [
-                "/usr/bin/python3", script_path,
-                "-f", str(task.freq_mhz),
-                "-g", str(kwargs.get("gain", self._config.default_gain)),
-                "-d", str(task.sdr_index),
+                "/usr/bin/python3",
+                script_path,
+                "-f",
+                str(task.freq_mhz),
+                "-g",
+                str(kwargs.get("gain", self._config.default_gain)),
+                "-d",
+                str(task.sdr_index),
                 "--json-events",
             ]
 
@@ -137,10 +167,14 @@ class CaptureService:
             log_file = os.path.join(
                 self._config.log_dir, f"alerts_{task.task_id}_{ts}.csv"
             )
-            cmd.extend([
-                "--log", log_file,
-                "--threshold", str(kwargs.get("threshold", -40)),
-            ])
+            cmd.extend(
+                [
+                    "--log",
+                    log_file,
+                    "--threshold",
+                    str(kwargs.get("threshold", -40)),
+                ]
+            )
             task.log_file = log_file
 
         # Squelch threshold
@@ -171,16 +205,14 @@ class CaptureService:
     async def _auto_stop(self, task: CaptureTask, duration: int):
         """Auto-stop a capture after the specified duration."""
         await asyncio.sleep(duration)
-        if task.status == 'running':
-            logger.info('Auto-stopping %s after %ds', task.task_id, duration)
+        if task.status == "running":
+            logger.info("Auto-stopping %s after %ds", task.task_id, duration)
             await self.stop_capture(task.task_id)
 
     async def _start_baseline(self, task: CaptureTask, duration: int, ts: str):
         """Run rtl_433 baseline capture."""
         duration = duration or 120
-        out_file = os.path.join(
-            self._config.baseline_dir, f"baseline_{ts}.csv"
-        )
+        out_file = os.path.join(self._config.baseline_dir, f"baseline_{ts}.csv")
         task.output_file = out_file
 
         freq_args = []
@@ -190,9 +222,12 @@ class CaptureService:
         cmd = [
             "rtl_433",
             *freq_args,
-            "-d", str(task.sdr_index),
-            "-F", f"csv:{out_file}",
-            "-T", str(duration),
+            "-d",
+            str(task.sdr_index),
+            "-F",
+            f"csv:{out_file}",
+            "-T",
+            str(duration),
         ]
 
         proc = await asyncio.create_subprocess_exec(
@@ -262,7 +297,9 @@ class CaptureService:
                 event_type=event_data.get("event_type", task.task_type),
                 freq_mhz=event_data.get("freq_mhz", task.freq_mhz),
                 duration_ms=event_data.get("duration_ms"),
-                peak_power_db=event_data.get("peak_power_db", event_data.get("power_db")),
+                peak_power_db=event_data.get(
+                    "peak_power_db", event_data.get("power_db")
+                ),
                 device_id=dev.db_id if dev else None,
                 gps_fix_id=gps_fix_id,
                 metadata_=event_data,

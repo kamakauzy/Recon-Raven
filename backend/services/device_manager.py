@@ -1,11 +1,12 @@
 """
 SDR Device Manager — enumerates, pools, and health-checks RTL-SDR and HackRF devices.
 """
+
 import asyncio
 import logging
 import re
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -61,7 +62,8 @@ class DeviceManager:
 
         logger.info(
             "Enumerated %d RTL-SDR(s), %d HackRF(s)",
-            len(rtl_devices), len(hackrf_devices),
+            len(rtl_devices),
+            len(hackrf_devices),
         )
         return list(self._devices.values())
 
@@ -70,7 +72,8 @@ class DeviceManager:
         devices = []
         try:
             proc = await asyncio.create_subprocess_exec(
-                "rtl_test", "-t",
+                "rtl_test",
+                "-t",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -85,7 +88,9 @@ class DeviceManager:
 
             # Also try rtl_eeprom for device listing
             proc2 = await asyncio.create_subprocess_exec(
-                "rtl_test", "-d", "99",  # nonexistent device forces device listing
+                "rtl_test",
+                "-d",
+                "99",  # nonexistent device forces device listing
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -107,12 +112,14 @@ class DeviceManager:
                 manufacturer = m.group(2).strip()
                 product = m.group(3).strip()
                 serial = m.group(4).strip()
-                devices.append(SDRDevice(
-                    index=idx,
-                    serial=serial,
-                    model=f"{manufacturer} {product}",
-                    device_type="rtlsdr",
-                ))
+                devices.append(
+                    SDRDevice(
+                        index=idx,
+                        serial=serial,
+                        model=f"{manufacturer} {product}",
+                        device_type="rtlsdr",
+                    )
+                )
         except FileNotFoundError:
             logger.warning("rtl_test not found — RTL-SDR enumeration skipped")
         except Exception as e:
@@ -135,12 +142,14 @@ class DeviceManager:
             # Parse serial numbers
             for m in re.finditer(r"Serial number:\s+(\S+)", output):
                 serial = m.group(1)
-                devices.append(SDRDevice(
-                    index=0,  # re-assigned later
-                    serial=serial,
-                    model="HackRF One",
-                    device_type="hackrf",
-                ))
+                devices.append(
+                    SDRDevice(
+                        index=0,  # re-assigned later
+                        serial=serial,
+                        model="HackRF One",
+                        device_type="hackrf",
+                    )
+                )
         except FileNotFoundError:
             logger.debug("hackrf_info not found — HackRF enumeration skipped")
         except asyncio.TimeoutError:
@@ -169,6 +178,7 @@ class DeviceManager:
 
             # Read back IDs
             from sqlalchemy import select
+
             result = await session.execute(select(Device))
             for db_dev in result.scalars():
                 if db_dev.sdr_index in self._devices:
@@ -184,7 +194,9 @@ class DeviceManager:
         lock = self._locks[sdr_index]
 
         if lock.locked():
-            raise RuntimeError(f"Device {sdr_index} is busy (task: {dev.assigned_task})")
+            raise RuntimeError(
+                f"Device {sdr_index} is busy (task: {dev.assigned_task})"
+            )
 
         async with lock:
             dev.status = "busy"
@@ -226,7 +238,10 @@ class DeviceManager:
     async def _rtl_health(self, index: int) -> bool:
         try:
             proc = await asyncio.create_subprocess_exec(
-                "rtl_test", "-d", str(index), "-t",
+                "rtl_test",
+                "-d",
+                str(index),
+                "-t",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

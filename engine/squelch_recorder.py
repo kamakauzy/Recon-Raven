@@ -14,6 +14,7 @@ Usage:
     ./squelch_recorder.py -f 915 -s -50 -o /tmp    # LoRa band, custom output dir
     ./squelch_recorder.py --headless                # no GUI, pure headless LP/OP
 """
+
 import argparse
 import os
 import sys
@@ -23,16 +24,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
-    from gnuradio import gr, blocks, analog, filter as grfilter
-    from gnuradio.filter import firdes
+    from gnuradio import gr, blocks, analog, filter as grfilter  # noqa: F401
+    from gnuradio.filter import firdes  # noqa: F401
     import osmosdr
 except ImportError:
-    print("[FATAL] GNU Radio not found. Install gnuradio + gr-osmosdr.", file=sys.stderr)
+    print(
+        "[FATAL] GNU Radio not found. Install gnuradio + gr-osmosdr.", file=sys.stderr
+    )
     sys.exit(1)
 
 # ── Probe-triggered file sink ─────────────────────────────────────────────
 # GNU Radio doesn't have a built-in "record only when signal present" block.
 # We use a power probe + a Python callback that swaps file sinks in/out.
+
 
 class SquelchRecorder(gr.top_block):
     def __init__(self, args):
@@ -46,7 +50,7 @@ class SquelchRecorder(gr.top_block):
         self.outdir.mkdir(parents=True, exist_ok=True)
         self.min_duration = args.min_duration
         self.max_duration = args.max_duration
-        self.json_events = getattr(args, 'json_events', False)
+        self.json_events = getattr(args, "json_events", False)
 
         self._recording = False
         self._rec_start = None
@@ -55,7 +59,7 @@ class SquelchRecorder(gr.top_block):
         self._capture_count = 0
 
         # ── Source ──
-        device_index = getattr(args, 'device', 0) or 0
+        device_index = getattr(args, "device", 0) or 0
         self.source = osmosdr.source(args=f"rtl={device_index}")
         self.source.set_sample_rate(self.samp_rate)
         self.source.set_center_freq(self.freq)
@@ -83,6 +87,7 @@ class SquelchRecorder(gr.top_block):
 
         # ── Periodic check thread ──
         import threading
+
         self._running = True
         self._monitor = threading.Thread(target=self._monitor_loop, daemon=True)
 
@@ -101,8 +106,11 @@ class SquelchRecorder(gr.top_block):
         while self._running:
             try:
                 level = self.probe.level()
-                power_db = 10 * (level + 1e-30).__log10__() if hasattr(level, '__log10__') else \
-                           10 * __import__('math').log10(max(level, 1e-30))
+                power_db = (
+                    10 * (level + 1e-30).__log10__()
+                    if hasattr(level, "__log10__")
+                    else 10 * __import__("math").log10(max(level, 1e-30))
+                )
 
                 now = time.time()
 
@@ -114,7 +122,9 @@ class SquelchRecorder(gr.top_block):
                         self._stop_recording()
                     elif elapsed >= self.max_duration:
                         self._stop_recording()
-                        self._log(f"Max duration {self.max_duration}s reached, splitting file")
+                        self._log(
+                            f"Max duration {self.max_duration}s reached, splitting file"
+                        )
 
                 time.sleep(0.1)  # 100ms polling
             except Exception as e:
@@ -130,7 +140,9 @@ class SquelchRecorder(gr.top_block):
         self.lock()
         try:
             self.disconnect(self.valve, self._null_file)
-            self._current_sink = blocks.file_sink(gr.sizeof_gr_complex, str(fpath), False)
+            self._current_sink = blocks.file_sink(
+                gr.sizeof_gr_complex, str(fpath), False
+            )
             self._current_sink.set_unbuffered(False)
             self.connect(self.valve, self._current_sink)
             self.valve.set_enabled(True)
@@ -145,9 +157,12 @@ class SquelchRecorder(gr.top_block):
 
         if self.json_events:
             import json
+
             event = {
                 "event_type": "rec_start",
-                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+                "timestamp": datetime.now(timezone.utc).strftime(
+                    "%Y-%m-%d %H:%M:%S.%f"
+                )[:-3],
                 "freq_mhz": self.freq / 1e6,
                 "file": fname,
                 "capture_num": self._capture_count,
@@ -168,12 +183,20 @@ class SquelchRecorder(gr.top_block):
         finally:
             self.unlock()
 
-        fsize = self._current_file.stat().st_size if self._current_file and self._current_file.exists() else 0
+        fsize = (
+            self._current_file.stat().st_size
+            if self._current_file and self._current_file.exists()
+            else 0
+        )
         self._log(f"REC STOP  → {elapsed:.1f}s, {fsize / 1024:.1f} KB")
 
         kept = True
         # Delete captures shorter than min_duration (noise triggers)
-        if elapsed < self.min_duration and self._current_file and self._current_file.exists():
+        if (
+            elapsed < self.min_duration
+            and self._current_file
+            and self._current_file.exists()
+        ):
             self._current_file.unlink()
             self._log(f"  Deleted (shorter than {self.min_duration}s minimum)")
             self._capture_count -= 1
@@ -181,9 +204,12 @@ class SquelchRecorder(gr.top_block):
 
         if kept and self.json_events:
             import json
+
             event = {
                 "event_type": "rec_stop",
-                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+                "timestamp": datetime.now(timezone.utc).strftime(
+                    "%Y-%m-%d %H:%M:%S.%f"
+                )[:-3],
                 "freq_mhz": self.freq / 1e6,
                 "file": str(self._current_file) if self._current_file else "",
                 "duration_s": round(elapsed, 1),
@@ -216,32 +242,71 @@ Output files: <outdir>/capture_<freq>MHz_<timestamp>_<rate>sps.cf32
 Open captures in URH, inspectrum, or GNU Radio for analysis.
         """,
     )
-    parser.add_argument("-f", "--freq", type=float, default=433.92,
-                        help="Center frequency in MHz (default: 433.92)")
-    parser.add_argument("-s", "--squelch", type=float, default=-40,
-                        help="Squelch threshold in dB (default: -40)")
-    parser.add_argument("-g", "--gain", type=float, default=38,
-                        help="RF gain (default: 38)")
-    parser.add_argument("-r", "--rate", type=float, default=2.4,
-                        help="Sample rate in Msps (default: 2.4)")
-    parser.add_argument("-o", "--output", type=str, default=os.path.expanduser("~/SIGINT/recordings"),
-                        help="Output directory (default: ~/SIGINT/recordings)")
-    parser.add_argument("--min", dest="min_duration", type=float, default=1.0,
-                        help="Minimum capture duration in seconds; shorter = noise (default: 1.0)")
-    parser.add_argument("--max", dest="max_duration", type=float, default=300,
-                        help="Maximum capture duration in seconds before file split (default: 300)")
-    parser.add_argument("--headless", action="store_true",
-                        help="No GUI, pure console output for LP/OP deployment")
-    parser.add_argument("-d", "--device", type=int, default=0,
-                        help="RTL-SDR device index (default: 0)")
-    parser.add_argument("--json-events", dest="json_events", action="store_true",
-                        help="Emit JSON event lines on stdout for integration")
+    parser.add_argument(
+        "-f",
+        "--freq",
+        type=float,
+        default=433.92,
+        help="Center frequency in MHz (default: 433.92)",
+    )
+    parser.add_argument(
+        "-s",
+        "--squelch",
+        type=float,
+        default=-40,
+        help="Squelch threshold in dB (default: -40)",
+    )
+    parser.add_argument(
+        "-g", "--gain", type=float, default=38, help="RF gain (default: 38)"
+    )
+    parser.add_argument(
+        "-r",
+        "--rate",
+        type=float,
+        default=2.4,
+        help="Sample rate in Msps (default: 2.4)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default=os.path.expanduser("~/SIGINT/recordings"),
+        help="Output directory (default: ~/SIGINT/recordings)",
+    )
+    parser.add_argument(
+        "--min",
+        dest="min_duration",
+        type=float,
+        default=1.0,
+        help="Minimum capture duration in seconds; shorter = noise (default: 1.0)",
+    )
+    parser.add_argument(
+        "--max",
+        dest="max_duration",
+        type=float,
+        default=300,
+        help="Maximum capture duration in seconds before file split (default: 300)",
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="No GUI, pure console output for LP/OP deployment",
+    )
+    parser.add_argument(
+        "-d", "--device", type=int, default=0, help="RTL-SDR device index (default: 0)"
+    )
+    parser.add_argument(
+        "--json-events",
+        dest="json_events",
+        action="store_true",
+        help="Emit JSON event lines on stdout for integration",
+    )
 
     args = parser.parse_args()
 
-    print(f"╔═══════════════════════════════════════════════╗")
-    print(f"║  Squelch-Triggered IQ Recorder                ║")
-    print(f"╠═══════════════════════════════════════════════╣")
+    print("╔═══════════════════════════════════════════════╗")
+    print("║  Squelch-Triggered IQ Recorder                ║")
+    print("╠═══════════════════════════════════════════════╣")
     print(f"║  Freq:     {args.freq:>10.4f} MHz                   ║")
     print(f"║  Squelch:  {args.squelch:>10.1f} dB                    ║")
     print(f"║  Gain:     {args.gain:>10.1f}                        ║")
@@ -249,8 +314,8 @@ Open captures in URH, inspectrum, or GNU Radio for analysis.
     print(f"║  Output:   {str(args.output):<35} ║")
     print(f"║  Min cap:  {args.min_duration:>10.1f} s                     ║")
     print(f"║  Max cap:  {args.max_duration:>10.1f} s                     ║")
-    print(f"╚═══════════════════════════════════════════════╝")
-    print(f"Monitoring... Ctrl+C to stop.\n")
+    print("╚═══════════════════════════════════════════════╝")
+    print("Monitoring... Ctrl+C to stop.\n")
 
     tb = SquelchRecorder(args)
 

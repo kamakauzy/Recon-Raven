@@ -15,9 +15,9 @@ Usage:
     ./intel_packager.py --bursts bursts.csv --baseline-diff diff.txt -o report.md
     ./intel_packager.py --all ~/SIGINT/logs/   # auto-discover all log files
 """
+
 import argparse
 import csv
-import os
 import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
@@ -32,13 +32,15 @@ def parse_bursts_csv(filepath):
     with open(filepath, "r", newline="", encoding="utf-8", errors="replace") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            bursts.append({
-                "time": row.get("timestamp_utc", ""),
-                "freq": row.get("freq_mhz", ""),
-                "duration_ms": _safe_float(row.get("duration_ms", "")),
-                "peak_db": _safe_float(row.get("peak_power_db", "")),
-                "iq_file": row.get("iq_file", ""),
-            })
+            bursts.append(
+                {
+                    "time": row.get("timestamp_utc", ""),
+                    "freq": row.get("freq_mhz", ""),
+                    "duration_ms": _safe_float(row.get("duration_ms", "")),
+                    "peak_db": _safe_float(row.get("peak_power_db", "")),
+                    "iq_file": row.get("iq_file", ""),
+                }
+            )
     return bursts
 
 
@@ -50,12 +52,14 @@ def parse_alerts_csv(filepath):
     with open(filepath, "r", newline="", encoding="utf-8", errors="replace") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            alerts.append({
-                "time": row.get("timestamp_utc", ""),
-                "freq": row.get("freq_mhz", ""),
-                "power_db": _safe_float(row.get("power_db", "")),
-                "alert_num": row.get("alert_num", ""),
-            })
+            alerts.append(
+                {
+                    "time": row.get("timestamp_utc", ""),
+                    "freq": row.get("freq_mhz", ""),
+                    "power_db": _safe_float(row.get("power_db", "")),
+                    "alert_num": row.get("alert_num", ""),
+                }
+            )
     return alerts
 
 
@@ -67,12 +71,16 @@ def parse_bearings_csv(filepath):
     with open(filepath, "r", newline="", encoding="utf-8", errors="replace") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            bearings.append({
-                "time": row.get("timestamp", row.get("timestamp_utc", "")),
-                "freq": row.get("freq", row.get("freq_mhz", "")),
-                "bearing": _safe_float(row.get("bearing", row.get("bearing_deg", ""))),
-                "confidence": row.get("confidence", ""),
-            })
+            bearings.append(
+                {
+                    "time": row.get("timestamp", row.get("timestamp_utc", "")),
+                    "freq": row.get("freq", row.get("freq_mhz", "")),
+                    "bearing": _safe_float(
+                        row.get("bearing", row.get("bearing_deg", ""))
+                    ),
+                    "confidence": row.get("confidence", ""),
+                }
+            )
     return bearings
 
 
@@ -119,7 +127,7 @@ def generate_report(bursts, alerts, bearings, baseline_diff_text, args):
     lines.append("# SIGINT Intelligence Summary")
     lines.append("")
     lines.append(f"**Generated:** {now}  ")
-    lines.append(f"**Classification:** UNCLASSIFIED // FOUO  ")
+    lines.append("**Classification:** UNCLASSIFIED // FOUO  ")
     if args.title:
         lines.append(f"**Operation:** {args.title}  ")
     if args.location:
@@ -147,16 +155,22 @@ def generate_report(bursts, alerts, bearings, baseline_diff_text, args):
             if a["freq"]:
                 freq_counter[a["freq"]] += 1
 
-        lines.append(f"- **{total_bursts}** burst(s) detected across **{len(freq_counter)}** frequency/frequencies")
+        lines.append(
+            f"- **{total_bursts}** burst(s) detected across **{len(freq_counter)}** frequency/frequencies"
+        )
         lines.append(f"- **{total_alerts}** threshold alert(s) triggered")
         if total_bearings:
             lines.append(f"- **{total_bearings}** DF bearing(s) recorded")
 
         # Time span
-        all_times = [b["time"] for b in bursts if b["time"]] + [a["time"] for a in alerts if a["time"]]
+        all_times = [b["time"] for b in bursts if b["time"]] + [
+            a["time"] for a in alerts if a["time"]
+        ]
         if all_times:
             all_times_sorted = sorted(all_times)
-            lines.append(f"- Collection window: `{all_times_sorted[0]}` → `{all_times_sorted[-1]}`")
+            lines.append(
+                f"- Collection window: `{all_times_sorted[0]}` → `{all_times_sorted[-1]}`"
+            )
 
         # Top frequencies
         if freq_counter:
@@ -189,14 +203,16 @@ def generate_report(bursts, alerts, bearings, baseline_diff_text, args):
             lines.append(f"### {freq} MHz ({len(fb)} bursts)")
             lines.append("")
             if durations:
-                lines.append(f"| Metric | Value |")
-                lines.append(f"|--------|-------|")
+                lines.append("| Metric | Value |")
+                lines.append("|--------|-------|")
                 lines.append(f"| Min duration | {min(durations):.1f} ms |")
                 lines.append(f"| Max duration | {max(durations):.1f} ms |")
-                lines.append(f"| Avg duration | {sum(durations)/len(durations):.1f} ms |")
+                lines.append(
+                    f"| Avg duration | {sum(durations) / len(durations):.1f} ms |"
+                )
                 if powers:
                     lines.append(f"| Peak power | {max(powers):.1f} dB |")
-                    lines.append(f"| Avg power | {sum(powers)/len(powers):.1f} dB |")
+                    lines.append(f"| Avg power | {sum(powers) / len(powers):.1f} dB |")
                 lines.append("")
 
             # Pattern of life — activity by hour
@@ -231,7 +247,9 @@ def generate_report(bursts, alerts, bearings, baseline_diff_text, args):
         lines.append("| # | Time (UTC) | Freq (MHz) | Power (dB) |")
         lines.append("|---|-----------|-----------|-----------|")
         for a in alerts[-20:]:  # Last 20 alerts
-            lines.append(f"| {a.get('alert_num', '?')} | {a['time']} | {a['freq']} | {a.get('power_db', 'N/A')} |")
+            lines.append(
+                f"| {a.get('alert_num', '?')} | {a['time']} | {a['freq']} | {a.get('power_db', 'N/A')} |"
+            )
         if len(alerts) > 20:
             lines.append(f"| ... | *{len(alerts) - 20} more alerts omitted* | | |")
         lines.append("")
@@ -248,7 +266,9 @@ def generate_report(bursts, alerts, bearings, baseline_diff_text, args):
         lines.append("|------|-----------|------------|-----------|")
         for b in bearings[-15:]:
             bearing_str = f"{b['bearing']:.0f}°" if b["bearing"] is not None else "N/A"
-            lines.append(f"| {b['time']} | {b['freq']} | {bearing_str} | {b.get('confidence', '')} |")
+            lines.append(
+                f"| {b['time']} | {b['freq']} | {bearing_str} | {b.get('confidence', '')} |"
+            )
         lines.append("")
 
         # If multiple bearings on same freq, note possible triangulation
@@ -257,9 +277,13 @@ def generate_report(bursts, alerts, bearings, baseline_diff_text, args):
         if multi:
             lines.append("**Triangulation candidates** (2+ bearings on same freq):")
             for f, c in multi.items():
-                fb = [b for b in bearings if b["freq"] == f and b["bearing"] is not None]
+                fb = [
+                    b for b in bearings if b["freq"] == f and b["bearing"] is not None
+                ]
                 bearing_vals = [b["bearing"] for b in fb]
-                lines.append(f"  - {f} MHz: {c} bearings ({min(bearing_vals):.0f}° – {max(bearing_vals):.0f}°)")
+                lines.append(
+                    f"  - {f} MHz: {c} bearings ({min(bearing_vals):.0f}° – {max(bearing_vals):.0f}°)"
+                )
             lines.append("")
 
         lines.append("---")
@@ -290,15 +314,23 @@ def generate_report(bursts, alerts, bearings, baseline_diff_text, args):
         freq_counter_b = Counter(b["freq"] for b in bursts if b["freq"])
         top_freq = freq_counter_b.most_common(1)
         if top_freq:
-            recommendations.append(f"- [ ] Prioritize collection on **{top_freq[0][0]} MHz** ({top_freq[0][1]} bursts)")
+            recommendations.append(
+                f"- [ ] Prioritize collection on **{top_freq[0][0]} MHz** ({top_freq[0][1]} bursts)"
+            )
 
     if bearings:
-        multi = {f: c for f, c in Counter(b["freq"] for b in bearings if b["freq"]).items() if c >= 2}
+        multi = {
+            f: c
+            for f, c in Counter(b["freq"] for b in bearings if b["freq"]).items()
+            if c >= 2
+        }
         for f in multi:
             recommendations.append(f"- [ ] Attempt triangulation fix on **{f} MHz**")
 
     if total_alerts > 10:
-        recommendations.append("- [ ] Consider tightening squelch threshold (high alert volume)")
+        recommendations.append(
+            "- [ ] Consider tightening squelch threshold (high alert volume)"
+        )
 
     if not recommendations:
         recommendations.append("- [ ] Continue baseline collection")
@@ -308,8 +340,8 @@ def generate_report(bursts, alerts, bearings, baseline_diff_text, args):
     lines.append("")
     lines.append("---")
     lines.append("")
-    lines.append(f"*Report generated by sigint-field-kit intel_packager.py*  ")
-    lines.append(f"*Source data should be retained per collection SOP*")
+    lines.append("*Report generated by sigint-field-kit intel_packager.py*  ")
+    lines.append("*Source data should be retained per collection SOP*")
     lines.append("")
 
     return "\n".join(lines)
@@ -330,22 +362,50 @@ Pipeline:
   burst_detector.py → baseline_diff.py → intel_packager.py → disseminate
         """,
     )
-    parser.add_argument("--bursts", type=str, default=None,
-                        help="Path to burst_detector CSV output")
-    parser.add_argument("--alerts", type=str, default=None,
-                        help="Path to signal_alerter CSV output")
-    parser.add_argument("--bearings", type=str, default=None,
-                        help="Path to DF bearings CSV (timestamp,freq,bearing_deg,confidence)")
-    parser.add_argument("--baseline-diff", dest="baseline_diff", type=str, default=None,
-                        help="Path to baseline_diff.py text report")
-    parser.add_argument("--all", type=str, default=None,
-                        help="Auto-discover all log files in this directory")
-    parser.add_argument("-o", "--output", type=str, default=None,
-                        help="Output file path (default: stdout)")
-    parser.add_argument("--title", type=str, default=None,
-                        help="Operation name/title for the report header")
-    parser.add_argument("--location", type=str, default=None,
-                        help="Collection location (grid square, coords, description)")
+    parser.add_argument(
+        "--bursts", type=str, default=None, help="Path to burst_detector CSV output"
+    )
+    parser.add_argument(
+        "--alerts", type=str, default=None, help="Path to signal_alerter CSV output"
+    )
+    parser.add_argument(
+        "--bearings",
+        type=str,
+        default=None,
+        help="Path to DF bearings CSV (timestamp,freq,bearing_deg,confidence)",
+    )
+    parser.add_argument(
+        "--baseline-diff",
+        dest="baseline_diff",
+        type=str,
+        default=None,
+        help="Path to baseline_diff.py text report",
+    )
+    parser.add_argument(
+        "--all",
+        type=str,
+        default=None,
+        help="Auto-discover all log files in this directory",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default=None,
+        help="Output file path (default: stdout)",
+    )
+    parser.add_argument(
+        "--title",
+        type=str,
+        default=None,
+        help="Operation name/title for the report header",
+    )
+    parser.add_argument(
+        "--location",
+        type=str,
+        default=None,
+        help="Collection location (grid square, coords, description)",
+    )
 
     args = parser.parse_args()
 
@@ -362,14 +422,19 @@ Pipeline:
             args.baseline_diff = str(discovered["baseline_diff"])
 
         if discovered:
-            print(f"[INFO] Auto-discovered: {', '.join(discovered.keys())}", file=sys.stderr)
+            print(
+                f"[INFO] Auto-discovered: {', '.join(discovered.keys())}",
+                file=sys.stderr,
+            )
         else:
             print(f"[WARN] No log files found in {args.all}", file=sys.stderr)
 
     # Check we have at least something to report on
     if not any([args.bursts, args.alerts, args.bearings, args.baseline_diff]):
-        print("[ERROR] No input data specified. Use --bursts, --alerts, --bearings, --baseline-diff, or --all.",
-              file=sys.stderr)
+        print(
+            "[ERROR] No input data specified. Use --bursts, --alerts, --bearings, --baseline-diff, or --all.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Parse inputs

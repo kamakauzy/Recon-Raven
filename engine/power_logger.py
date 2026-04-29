@@ -17,9 +17,9 @@ Usage:
     ./power_logger.py --duration 3600              # run for 1 hour
     ./power_logger.py --heatmap                    # generate heatmap plot at end
 """
+
 import argparse
 import csv
-import math
 import os
 import signal as sig
 import subprocess
@@ -32,7 +32,7 @@ from pathlib import Path
 def validate_rtl_power():
     """Check that rtl_power is available."""
     try:
-        result = subprocess.run(["rtl_power", "-h"], capture_output=True, timeout=5)
+        subprocess.run(["rtl_power", "-h"], capture_output=True, timeout=5)
         return True
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
@@ -50,35 +50,44 @@ def run_power_scan(args):
     freq_range = f"{int(args.lower * 1e6)}:{int(args.upper * 1e6)}:{args.bin_size}"
     interval = str(args.interval)
 
-    cmd = [
+    [
         "rtl_power",
-        "-f", freq_range,
-        "-i", interval,
-        "-g", str(args.gain),
-        "-p", str(args.ppm),
+        "-f",
+        freq_range,
+        "-i",
+        interval,
+        "-g",
+        str(args.gain),
+        "-p",
+        str(args.ppm),
         "-1",  # single-shot per interval (we loop externally for control)
     ]
 
-    print(f"╔═══════════════════════════════════════════════╗")
-    print(f"║  Power Logger                                 ║")
-    print(f"╠═══════════════════════════════════════════════╣")
+    print("╔═══════════════════════════════════════════════╗")
+    print("║  Power Logger                                 ║")
+    print("╠═══════════════════════════════════════════════╣")
     print(f"║  Range:     {args.lower:>7.1f} - {args.upper:<7.1f} MHz            ║")
     print(f"║  Bin size:  {args.bin_size:>10}                      ║")
     print(f"║  Interval:  {args.interval:>10}s                     ║")
     print(f"║  Gain:      {args.gain:>10.1f}                       ║")
     print(f"║  Duration:  {args.duration:>10}s                     ║")
     print(f"║  Output:    {str(csv_file.name):<35}║")
-    print(f"╚═══════════════════════════════════════════════╝")
-    print(f"Logging power data... Ctrl+C to stop.\n")
+    print("╚═══════════════════════════════════════════════╝")
+    print("Logging power data... Ctrl+C to stop.\n")
 
     # Use continuous mode with file output
     cmd_continuous = [
         "rtl_power",
-        "-f", freq_range,
-        "-i", interval,
-        "-g", str(args.gain),
-        "-p", str(args.ppm),
-        "-d", str(getattr(args, 'device', 0) or 0),
+        "-f",
+        freq_range,
+        "-i",
+        interval,
+        "-g",
+        str(args.gain),
+        "-p",
+        str(args.ppm),
+        "-d",
+        str(getattr(args, "device", 0) or 0),
     ]
 
     if args.duration > 0:
@@ -110,10 +119,7 @@ def run_power_scan(args):
 
     try:
         process = subprocess.Popen(
-            cmd_continuous,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+            cmd_continuous, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
         )
 
         # Monitor progress by watching file growth
@@ -144,8 +150,9 @@ def run_power_scan(args):
                         pass
 
                     ts_now = datetime.now().strftime("%H:%M:%S")
-                    if getattr(args, 'json_events', False):
+                    if getattr(args, "json_events", False):
                         import json as _json
+
                         try:
                             # Aggregate all sub-band lines from latest sweep
                             with open(csv_file, "r") as jf:
@@ -170,11 +177,14 @@ def run_power_scan(args):
                                 if sweep_lines:
                                     all_powers = []
                                     for p in sweep_lines:
-                                        all_powers.extend(float(x) for x in p[6:] if x.strip())
+                                        all_powers.extend(
+                                            float(x) for x in p[6:] if x.strip()
+                                        )
                                     frame = {
                                         "event_type": "spectrum",
                                         "timestamp": f"{sweep_lines[0][0]} {sweep_lines[0][1]}",
-                                        "freq_start_mhz": float(sweep_lines[0][2]) / 1e6,
+                                        "freq_start_mhz": float(sweep_lines[0][2])
+                                        / 1e6,
                                         "freq_end_mhz": float(sweep_lines[-1][3]) / 1e6,
                                         "bin_hz": float(sweep_lines[0][4]),
                                         "powers": all_powers,
@@ -184,9 +194,11 @@ def run_power_scan(args):
                         except Exception:
                             pass
                     else:
-                        print(f"[{ts_now}] Sweep #{scan_count:>4d}  "
-                              f"elapsed={elapsed:.0f}s  peak={peak_power:.1f}dB",
-                              flush=True)
+                        print(
+                            f"[{ts_now}] Sweep #{scan_count:>4d}  "
+                            f"elapsed={elapsed:.0f}s  peak={peak_power:.1f}dB",
+                            flush=True,
+                        )
 
         # Process finished
         elapsed = time.time() - start_time
@@ -205,7 +217,7 @@ def run_power_scan(args):
 def write_summary(summary_file, args, scan_count, elapsed, peak_power, csv_file):
     """Write a human-readable summary alongside the CSV."""
     with open(summary_file, "w") as f:
-        f.write(f"Power Logger Summary\n")
+        f.write("Power Logger Summary\n")
         f.write(f"{'=' * 40}\n")
         f.write(f"Range:     {args.lower} - {args.upper} MHz\n")
         f.write(f"Bin size:  {args.bin_size}\n")
@@ -223,15 +235,21 @@ def generate_heatmap(csv_file):
     try:
         import numpy as np
     except ImportError:
-        print("[WARN] numpy not available, skipping heatmap generation", file=sys.stderr)
+        print(
+            "[WARN] numpy not available, skipping heatmap generation", file=sys.stderr
+        )
         return
 
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
-        print("[WARN] matplotlib not available, skipping heatmap generation", file=sys.stderr)
+        print(
+            "[WARN] matplotlib not available, skipping heatmap generation",
+            file=sys.stderr,
+        )
         return
 
     print("[INFO] Generating heatmap...")
@@ -251,7 +269,7 @@ def generate_heatmap(csv_file):
                 time_str = row[1]
                 hz_low = float(row[2])
                 hz_high = float(row[3])
-                hz_step = float(row[4])
+                float(row[4])
                 # row[5] = num_samples
                 powers = [float(p) for p in row[6:]]
 
@@ -272,9 +290,13 @@ def generate_heatmap(csv_file):
     data = np.array(power_data)
     fig, ax = plt.subplots(figsize=(14, 6))
     im = ax.imshow(
-        data.T, aspect="auto", origin="lower",
+        data.T,
+        aspect="auto",
+        origin="lower",
         extent=[0, len(times), freq_bins[0], freq_bins[-1]],
-        cmap="inferno", vmin=-60, vmax=-10
+        cmap="inferno",
+        vmin=-60,
+        vmax=-10,
     )
     ax.set_xlabel("Sweep #")
     ax.set_ylabel("Frequency (MHz)")
@@ -305,29 +327,73 @@ a spectrogram image (requires numpy + matplotlib).
 Feed data into baseline_diff.py for change detection.
         """,
     )
-    parser.add_argument("-l", "--lower", type=float, default=400,
-                        help="Lower frequency bound in MHz (default: 400)")
-    parser.add_argument("-u", "--upper", type=float, default=450,
-                        help="Upper frequency bound in MHz (default: 450)")
-    parser.add_argument("-b", "--bin-size", dest="bin_size", type=str, default="100k",
-                        help="Frequency bin size (default: 100k)")
-    parser.add_argument("-i", "--interval", type=float, default=10,
-                        help="Sweep interval in seconds (default: 10)")
-    parser.add_argument("-g", "--gain", type=float, default=38,
-                        help="RF gain (default: 38)")
-    parser.add_argument("-p", "--ppm", type=int, default=0,
-                        help="Frequency correction in ppm (default: 0)")
-    parser.add_argument("-d", "--duration", type=int, default=0,
-                        help="Total duration in seconds, 0=infinite (default: 0)")
-    parser.add_argument("-o", "--output", type=str,
-                        default=os.path.expanduser("~/SIGINT/logs"),
-                        help="Output directory (default: ~/SIGINT/logs)")
-    parser.add_argument("--heatmap", action="store_true",
-                        help="Generate heatmap image after completion (needs numpy+matplotlib)")
-    parser.add_argument("--device", type=int, default=0,
-                        help="RTL-SDR device index (default: 0)")
-    parser.add_argument("--json-events", dest="json_events", action="store_true",
-                        help="Emit JSON spectrum frames on stdout for WebSocket streaming")
+    parser.add_argument(
+        "-l",
+        "--lower",
+        type=float,
+        default=400,
+        help="Lower frequency bound in MHz (default: 400)",
+    )
+    parser.add_argument(
+        "-u",
+        "--upper",
+        type=float,
+        default=450,
+        help="Upper frequency bound in MHz (default: 450)",
+    )
+    parser.add_argument(
+        "-b",
+        "--bin-size",
+        dest="bin_size",
+        type=str,
+        default="100k",
+        help="Frequency bin size (default: 100k)",
+    )
+    parser.add_argument(
+        "-i",
+        "--interval",
+        type=float,
+        default=10,
+        help="Sweep interval in seconds (default: 10)",
+    )
+    parser.add_argument(
+        "-g", "--gain", type=float, default=38, help="RF gain (default: 38)"
+    )
+    parser.add_argument(
+        "-p",
+        "--ppm",
+        type=int,
+        default=0,
+        help="Frequency correction in ppm (default: 0)",
+    )
+    parser.add_argument(
+        "-d",
+        "--duration",
+        type=int,
+        default=0,
+        help="Total duration in seconds, 0=infinite (default: 0)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default=os.path.expanduser("~/SIGINT/logs"),
+        help="Output directory (default: ~/SIGINT/logs)",
+    )
+    parser.add_argument(
+        "--heatmap",
+        action="store_true",
+        help="Generate heatmap image after completion (needs numpy+matplotlib)",
+    )
+    parser.add_argument(
+        "--device", type=int, default=0, help="RTL-SDR device index (default: 0)"
+    )
+    parser.add_argument(
+        "--json-events",
+        dest="json_events",
+        action="store_true",
+        help="Emit JSON spectrum frames on stdout for WebSocket streaming",
+    )
 
     args = parser.parse_args()
 

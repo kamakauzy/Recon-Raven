@@ -1,6 +1,7 @@
 """
 Recon-Raven — FastAPI application entry point.
 """
+
 import asyncio
 import logging
 from contextlib import asynccontextmanager
@@ -11,10 +12,23 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import load_settings
 from .db.database import init_db, get_session_factory
-from .api.routes import router as api_router, set_session_factory, set_services, set_scheduler, set_classifier, set_tx_service, set_fissure_service, set_push_service, set_federation_service
+from .api.routes import (
+    router as api_router,
+    set_session_factory,
+    set_services,
+    set_scheduler,
+    set_classifier,
+    set_tx_service,
+    set_fissure_service,
+    set_push_service,
+    set_federation_service,
+)
 from .api.tile_proxy import router as tile_router
 from .api.websocket import (
-    ws_manager, spectrum_endpoint, alerts_endpoint, status_endpoint,
+    ws_manager,
+    spectrum_endpoint,
+    alerts_endpoint,
+    status_endpoint,
 )
 from .services.device_manager import DeviceManager
 from .services.gps_poller import GPSPoller
@@ -51,17 +65,19 @@ async def _periodic_health_check():
             await device_manager.health_check_all()
             # Broadcast status update
             devices = device_manager.list_devices()
-            await ws_manager.broadcast_device_status({
-                "devices": [
-                    {
-                        "sdr_index": d.index,
-                        "model": d.model,
-                        "status": d.status,
-                        "assigned_task": d.assigned_task,
-                    }
-                    for d in devices
-                ]
-            })
+            await ws_manager.broadcast_device_status(
+                {
+                    "devices": [
+                        {
+                            "sdr_index": d.index,
+                            "model": d.model,
+                            "status": d.status,
+                            "assigned_task": d.assigned_task,
+                        }
+                        for d in devices
+                    ]
+                }
+            )
         except asyncio.CancelledError:
             break
         except Exception as e:
@@ -103,7 +119,9 @@ async def lifespan(app: FastAPI):
 
     # 4. Capture service
     classifier = Classifier(
-        rules_dir=str(Path(settings.engine_dir).parent / "backend" / "classifier" / "rules"),
+        rules_dir=str(
+            Path(settings.engine_dir).parent / "backend" / "classifier" / "rules"
+        ),
     )
     capture_service = CaptureService(
         engine_dir=settings.engine_dir,
@@ -176,7 +194,9 @@ async def lifespan(app: FastAPI):
     # 7. Start periodic health checks
     _health_task = asyncio.create_task(_periodic_health_check())
 
-    logger.info("Recon-Raven ready — http://%s:%d", settings.server.host, settings.server.port)
+    logger.info(
+        "Recon-Raven ready — http://%s:%d", settings.server.host, settings.server.port
+    )
 
     yield
 

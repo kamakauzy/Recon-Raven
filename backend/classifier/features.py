@@ -3,8 +3,8 @@ Feature extraction from IQ captures for ML classification.
 
 Extracts spectral and temporal features from cf32 IQ files.
 """
+
 import logging
-import struct
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -53,7 +53,7 @@ def extract_features(iq_path: str, sample_rate: float = 2.4e6) -> Optional[Dict]
         # Bandwidth estimation via FFT
         fft_size = min(4096, len(raw))
         spectrum = np.fft.fftshift(np.abs(np.fft.fft(raw[:fft_size])))
-        spectrum_db = 10 * np.log10(np.maximum(spectrum ** 2, 1e-30))
+        spectrum_db = 10 * np.log10(np.maximum(spectrum**2, 1e-30))
         noise_floor = np.median(spectrum_db)
         above_noise = spectrum_db > (noise_floor + 6)  # 6 dB above noise
         bw_bins = np.sum(above_noise)
@@ -81,7 +81,7 @@ def extract_features(iq_path: str, sample_rate: float = 2.4e6) -> Optional[Dict]
         inst_freq = np.diff(np.unwrap(phase)) * sample_rate / (2 * np.pi)
 
         freq_std = np.std(inst_freq)
-        freq_mean_abs = np.mean(np.abs(inst_freq))
+        np.mean(np.abs(inst_freq))
 
         if freq_std < 1000:
             features["modulation_hint"] = "CW"
@@ -93,19 +93,21 @@ def extract_features(iq_path: str, sample_rate: float = 2.4e6) -> Optional[Dict]
             features["modulation_hint"] = "wideband"
 
         # Symbol rate estimation (from autocorrelation of envelope)
-        envelope = np.abs(raw[:min(100000, len(raw))])
+        envelope = np.abs(raw[: min(100000, len(raw))])
         env_norm = envelope - np.mean(envelope)
-        autocorr = np.correlate(env_norm[:4096], env_norm[:4096], mode='full')
-        autocorr = autocorr[len(autocorr) // 2:]
+        autocorr = np.correlate(env_norm[:4096], env_norm[:4096], mode="full")
+        autocorr = autocorr[len(autocorr) // 2 :]
 
         # Find first significant peak after zero-lag
         if len(autocorr) > 100:
             autocorr_norm = autocorr / (autocorr[0] + 1e-30)
             peaks = []
             for i in range(10, len(autocorr_norm) - 1):
-                if (autocorr_norm[i] > autocorr_norm[i-1] and
-                    autocorr_norm[i] > autocorr_norm[i+1] and
-                    autocorr_norm[i] > 0.3):
+                if (
+                    autocorr_norm[i] > autocorr_norm[i - 1]
+                    and autocorr_norm[i] > autocorr_norm[i + 1]
+                    and autocorr_norm[i] > 0.3
+                ):
                     peaks.append(i)
                     break
 

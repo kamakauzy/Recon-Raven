@@ -1,10 +1,10 @@
 """
 WebSocket handlers for real-time data streaming.
 """
-import asyncio
+
 import json
 import logging
-from typing import Dict, List, Set
+from typing import Dict, Set
 
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -28,8 +28,12 @@ class ConnectionManager:
             self._channels[channel] = set()
         await websocket.accept()
         self._channels[channel].add(websocket)
-        logger.info("WS connect: %s (channel=%s, total=%d)",
-                     websocket.client, channel, len(self._channels[channel]))
+        logger.info(
+            "WS connect: %s (channel=%s, total=%d)",
+            websocket.client,
+            channel,
+            len(self._channels[channel]),
+        )
 
     def disconnect(self, websocket: WebSocket, channel: str):
         if channel in self._channels:
@@ -55,24 +59,33 @@ class ConnectionManager:
 
     async def broadcast_alert(self, event_data: dict):
         """Broadcast an alert event to all alert subscribers."""
-        await self.broadcast("alerts", {
-            "type": "alert",
-            "data": event_data,
-        })
+        await self.broadcast(
+            "alerts",
+            {
+                "type": "alert",
+                "data": event_data,
+            },
+        )
 
     async def broadcast_spectrum_frame(self, frame_data: dict):
         """Broadcast a spectrum frame to all spectrum subscribers."""
-        await self.broadcast("spectrum", {
-            "type": "spectrum",
-            "data": frame_data,
-        })
+        await self.broadcast(
+            "spectrum",
+            {
+                "type": "spectrum",
+                "data": frame_data,
+            },
+        )
 
     async def broadcast_device_status(self, device_data: dict):
         """Broadcast device status update."""
-        await self.broadcast("status", {
-            "type": "device_status",
-            "data": device_data,
-        })
+        await self.broadcast(
+            "status",
+            {
+                "type": "device_status",
+                "data": device_data,
+            },
+        )
 
     def client_count(self, channel: str) -> int:
         return len(self._channels.get(channel, set()))

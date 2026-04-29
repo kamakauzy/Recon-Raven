@@ -1,7 +1,9 @@
 """
 REST API routes for Recon-Raven.
 """
+
 import os
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -10,12 +12,14 @@ from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.models import Baseline, BaselineDiff, Device, Event, GPSFix, Report
+from ..db.models import Baseline, BaselineDiff, Event, GPSFix, Report
 
+logger = logging.getLogger("raven.api")
 router = APIRouter(prefix="/api")
 
 
 # ── Pydantic schemas ─────────────────────────────────────────
+
 
 class DeviceOut(BaseModel):
     id: int
@@ -149,6 +153,7 @@ def set_scheduler(sched):
 
 # ── Health ───────────────────────────────────────────────────
 
+
 @router.get("/health", response_model=HealthOut)
 async def health():
     uptime = (datetime.now(timezone.utc) - _start_time).total_seconds()
@@ -163,6 +168,7 @@ async def health():
 
 
 # ── Devices ──────────────────────────────────────────────────
+
 
 @router.get("/devices")
 async def list_devices():
@@ -201,12 +207,21 @@ async def device_health(sdr_index: int):
 
 # ── GPS ──────────────────────────────────────────────────────
 
+
 @router.get("/gps/current", response_model=GPSOut)
 async def gps_current():
     if not _gps_poller:
-        return GPSOut(has_fix=False, latitude=None, longitude=None, altitude_m=None,
-                      speed_mps=None, heading_deg=None, error_m=None, satellites=None,
-                      timestamp=None)
+        return GPSOut(
+            has_fix=False,
+            latitude=None,
+            longitude=None,
+            altitude_m=None,
+            speed_mps=None,
+            heading_deg=None,
+            error_m=None,
+            satellites=None,
+            timestamp=None,
+        )
     fix = _gps_poller.current_fix
     return GPSOut(**fix.to_dict())
 
@@ -234,6 +249,7 @@ async def gps_history(
 
 
 # ── Captures ─────────────────────────────────────────────────
+
 
 @router.post("/captures/start", response_model=CaptureOut)
 async def start_capture(req: CaptureStartRequest):
@@ -297,6 +313,7 @@ async def list_active_captures():
 
 # ── Events ───────────────────────────────────────────────────
 
+
 @router.get("/events")
 async def list_events(
     event_type: Optional[str] = None,
@@ -335,6 +352,7 @@ async def list_events(
 
 
 # ── Baselines ────────────────────────────────────────────────
+
 
 @router.get("/baselines")
 async def list_baselines(
@@ -381,6 +399,7 @@ async def get_baseline_diff(
 
 # ── Reports ──────────────────────────────────────────────────
 
+
 @router.get("/reports")
 async def list_reports(
     limit: int = Query(50, le=500),
@@ -422,15 +441,11 @@ async def get_report(report_id: int, db: AsyncSession = Depends(get_db)):
     }
 
 
-
-
 @router.post("/reports/generate")
 async def generate_report(db: AsyncSession = Depends(get_db)):
     """Generate an intel summary report from current event data."""
     # Query all events
-    result = await db.execute(
-        select(Event).order_by(desc(Event.timestamp)).limit(500)
-    )
+    result = await db.execute(select(Event).order_by(desc(Event.timestamp)).limit(500))
     events = result.scalars().all()
 
     now = datetime.now(timezone.utc)
@@ -441,7 +456,7 @@ async def generate_report(db: AsyncSession = Depends(get_db)):
         "# SIGINT Intelligence Summary",
         "",
         f"**Generated:** {now.strftime('%Y-%m-%d %H:%M:%S UTC')}  ",
-        f"**Classification:** UNCLASSIFIED // FOUO  ",
+        "**Classification:** UNCLASSIFIED // FOUO  ",
         "",
         "---",
         "",
@@ -457,12 +472,15 @@ async def generate_report(db: AsyncSession = Depends(get_db)):
     else:
         # Frequency breakdown
         from collections import Counter
+
         freq_counter = Counter()
         for e in bursts + alerts:
             if e.freq_mhz:
                 freq_counter[f"{e.freq_mhz:.4f}"] += 1
 
-        lines.append(f"- **{len(bursts)}** burst(s) detected across **{len(freq_counter)}** frequency/frequencies")
+        lines.append(
+            f"- **{len(bursts)}** burst(s) detected across **{len(freq_counter)}** frequency/frequencies"
+        )
         lines.append(f"- **{len(alerts)}** threshold alert(s) triggered")
         lines.append(f"- **{len(events)}** total events in database")
 
@@ -470,7 +488,9 @@ async def generate_report(db: AsyncSession = Depends(get_db)):
         timestamps = [e.timestamp for e in events if e.timestamp]
         if timestamps:
             ts_sorted = sorted(timestamps)
-            lines.append(f"- Collection window: `{ts_sorted[0].strftime('%Y-%m-%d %H:%M:%S')}` → `{ts_sorted[-1].strftime('%Y-%m-%d %H:%M:%S')}`")
+            lines.append(
+                f"- Collection window: `{ts_sorted[0].strftime('%Y-%m-%d %H:%M:%S')}` → `{ts_sorted[-1].strftime('%Y-%m-%d %H:%M:%S')}`"
+            )
 
         if freq_counter:
             lines.append("")
@@ -519,6 +539,7 @@ async def generate_report(db: AsyncSession = Depends(get_db)):
 
     # Save to disk
     from pathlib import Path
+
     report_dir = Path("/var/lib/recon-raven/reports")
     report_dir.mkdir(parents=True, exist_ok=True)
     filepath = report_dir / f"intel_{ts}.md"
@@ -546,6 +567,7 @@ async def generate_report(db: AsyncSession = Depends(get_db)):
 
 
 # ── Scheduler ────────────────────────────────────────────────
+
 
 @router.get("/scheduler/jobs")
 async def list_scheduler_jobs():
@@ -583,6 +605,7 @@ async def resume_scheduler_job(job_id: str):
 
 # ── Direction Finding ────────────────────────────────────────
 
+
 class DFMeasurementIn(BaseModel):
     latitude: float
     longitude: float
@@ -602,14 +625,24 @@ async def solve_df(req: DFSolveRequest):
 
     measurements = []
     for m in req.measurements:
-        measurements.append(DFMeasurement(
-            latitude=m.get("latitude") if isinstance(m, dict) else m.latitude,
-            longitude=m.get("longitude") if isinstance(m, dict) else m.longitude,
-            bearing_deg=m.get("bearing_deg") if isinstance(m, dict) else m.bearing_deg,
-            power_db=m.get("power_db", -30) if isinstance(m, dict) else getattr(m, "power_db", -30),
-            freq_mhz=m.get("freq_mhz", 433.92) if isinstance(m, dict) else getattr(m, "freq_mhz", 433.92),
-            confidence=m.get("confidence", 1.0) if isinstance(m, dict) else getattr(m, "confidence", 1.0),
-        ))
+        measurements.append(
+            DFMeasurement(
+                latitude=m.get("latitude") if isinstance(m, dict) else m.latitude,
+                longitude=m.get("longitude") if isinstance(m, dict) else m.longitude,
+                bearing_deg=m.get("bearing_deg")
+                if isinstance(m, dict)
+                else m.bearing_deg,
+                power_db=m.get("power_db", -30)
+                if isinstance(m, dict)
+                else getattr(m, "power_db", -30),
+                freq_mhz=m.get("freq_mhz", 433.92)
+                if isinstance(m, dict)
+                else getattr(m, "freq_mhz", 433.92),
+                confidence=m.get("confidence", 1.0)
+                if isinstance(m, dict)
+                else getattr(m, "confidence", 1.0),
+            )
+        )
 
     if len(measurements) < 2:
         raise HTTPException(400, "Need at least 2 bearing measurements")
@@ -628,6 +661,7 @@ async def solve_df(req: DFSolveRequest):
 
 
 # ── Classification ───────────────────────────────────────────
+
 
 @router.get("/classifier/rules")
 async def list_classification_rules():
@@ -701,6 +735,7 @@ async def tx_transmit(req: TXRequestIn):
         raise HTTPException(503, "TX service not initialized")
 
     from ..services.tx_service import TXRequest
+
     tx_req = TXRequest(
         freq_hz=int(req.freq_mhz * 1e6),
         gain_db=req.gain_db,
@@ -734,6 +769,7 @@ async def tx_replay(req: TXRequestIn):
         raise HTTPException(400, "iq_file path is required")
 
     from ..services.tx_service import TXRequest
+
     tx_req = TXRequest(
         freq_hz=int(req.freq_mhz * 1e6),
         gain_db=req.gain_db,
@@ -884,14 +920,29 @@ async def federation_peers():
     return _federation_service.get_peers()
 
 
+@router.post("/federation/peers")
+async def add_federation_peer(payload: dict):
+    """Manually add a federation peer."""
+    if not _federation_service:
+        raise HTTPException(503, "Federation service not initialized")
+    node_id = payload.get("node_id", payload.get("host", "unknown"))
+    host = payload.get("host")
+    port = payload.get("port", 8080)
+    if not host:
+        raise HTTPException(400, "host is required")
+    peer = _federation_service.add_peer(node_id, host, int(port))
+    return peer
+
+
 @router.post("/federation/receive")
 async def federation_receive(payload: dict):
     """Receive an event shared from a peer node."""
     # For now, log it — eventually persist to DB
     from_node = payload.get("from_node", "unknown")
     event = payload.get("event", {})
-    logger.info("Received federated event from %s: %s",
-                from_node, event.get("event_type", "?"))
+    logger.info(
+        "Received federated event from %s: %s", from_node, event.get("event_type", "?")
+    )
     return {"received": True}
 
 

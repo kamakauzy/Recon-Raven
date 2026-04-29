@@ -1,6 +1,7 @@
 """
 Recon-Raven configuration — loads from config.yml + environment overrides.
 """
+
 import os
 from pathlib import Path
 from typing import List, Tuple
@@ -107,7 +108,15 @@ def load_settings() -> Settings:
     settings = Settings(**flat)
 
     # Apply nested sections
-    for section_name in ("server", "gps", "scheduler", "capture", "tx", "fissure", "devices"):
+    for section_name in (
+        "server",
+        "gps",
+        "scheduler",
+        "capture",
+        "tx",
+        "fissure",
+        "devices",
+    ):
         if section_name in file_cfg and isinstance(file_cfg[section_name], dict):
             section_cls = type(getattr(settings, section_name))
             setattr(settings, section_name, section_cls(**file_cfg[section_name]))

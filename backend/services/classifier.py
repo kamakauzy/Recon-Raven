@@ -1,10 +1,11 @@
 """
 Signal classifier — rule-based + ML pipeline for auto-classifying detected signals.
 """
+
 import fnmatch
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import yaml
 
@@ -14,8 +15,14 @@ logger = logging.getLogger("raven.classifier")
 class ClassificationResult:
     __slots__ = ("label", "confidence", "method", "rule_name", "features")
 
-    def __init__(self, label: str, confidence: float, method: str = "rule",
-                 rule_name: str = "", features: dict = None):
+    def __init__(
+        self,
+        label: str,
+        confidence: float,
+        method: str = "rule",
+        rule_name: str = "",
+        features: dict = None,
+    ):
         self.label = label
         self.confidence = confidence
         self.method = method
@@ -119,7 +126,7 @@ class ClassificationRule:
             return False
 
         for i in range(0, len(ranges), 2):
-            if ranges[i] <= freq <= ranges[i+1]:
+            if ranges[i] <= freq <= ranges[i + 1]:
                 return True
         return False
 
@@ -202,6 +209,7 @@ class Classifier:
         """Load a trained ML model for classification."""
         try:
             import joblib
+
             self._ml_model = joblib.load(model_path)
             logger.info("ML model loaded: %s", model_path)
         except Exception as e:

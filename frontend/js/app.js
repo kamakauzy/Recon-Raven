@@ -211,14 +211,48 @@
   }
 
   async function loadDiff(baselineId) {
+    const diffEl = document.getElementById('baseline-diff');
+    const contentEl = document.getElementById('diff-content');
     try {
       const diff = await api('/baselines/' + baselineId + '/diff');
-      document.getElementById('diff-content').textContent = diff.report_text;
-      document.getElementById('baseline-diff').style.display = 'block';
+      contentEl.textContent = diff.report_text;
+      diffEl.style.display = 'block';
     } catch (e) {
-      document.getElementById('baseline-diff').style.display = 'none';
+      contentEl.textContent = 'No previous baseline to compare against. Capture a second baseline to see changes.';
+      contentEl.style.color = 'var(--text-dim)';
+      diffEl.style.display = 'block';
     }
   }
+
+  document.getElementById('btn-baseline-now').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-baseline-now');
+    btn.disabled = true;
+    btn.textContent = 'Capturing...';
+    try {
+      await api('/captures/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task_type: 'baseline',
+          sdr_index: 0,
+          freq_mhz: 435,
+          freq_low: 430,
+          freq_high: 440,
+          duration: 120,
+        }),
+      });
+      btn.textContent = 'Running (120s)...';
+      setTimeout(async () => {
+        btn.disabled = false;
+        btn.textContent = 'Capture Now';
+        await loadBaselines();
+      }, 125000);
+    } catch (e) {
+      alert('Baseline capture failed: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Capture Now';
+    }
+  });
 
   // ── Reports ─────────────────────────────────────────────
   async function loadReports() {
@@ -488,10 +522,12 @@
         item.style.flexDirection = 'column';
         item.style.alignItems = 'flex-start';
         item.innerHTML = `
-          <div><strong>${p.protocol || p.name || 'Unknown'}</strong></div>
+          <div><strong>${p.protocol || p.name || 'Unknown'}</strong>
+            ${p.match_score ? '<span style="float:right;font-size:10px;color:var(--green);">' + p.match_score + '%</span>' : ''}
+          </div>
           <div style="font-size:11px;color:var(--text-dim);">
-            ${p.modulation || ''} &bull; ${p.frequency || p.freq || ''} MHz
-            ${p.bandwidth ? '&bull; BW: ' + p.bandwidth : ''}
+            ${p.soi_name ? p.soi_name + ' &bull; ' : ''}${p.modulation || ''} &bull; ${p.frequency_mhz || p.frequency || ''} MHz
+            ${p.bandwidth_mhz ? '&bull; BW: ' + p.bandwidth_mhz + ' MHz' : ''}
           </div>
         `;
         el.appendChild(item);
@@ -503,12 +539,10 @@
   });
 
   document.getElementById('btn-fissure-launch').addEventListener('click', async () => {
+    const freq = parseFloat(document.getElementById('fissure-freq').value);
     try {
-      await api('/fissure/launch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ freq_mhz: parseFloat(document.getElementById('fissure-freq').value) }),
-      });
+      await api('/fissure/launch?freq_mhz=' + freq, { method: 'POST' });
+      alert('FISSURE launch requested — open FISSURE GUI on the sensor node.');
     } catch (e) {
       alert('FISSURE launch error: ' + e.message);
     }
@@ -584,7 +618,7 @@
           freq_mhz: freq,
           gain_db: gain,
           duration_s: dur,
-          tx_type: txType,
+          waveform: txType,
         }),
       });
       resultEl.style.display = 'block';

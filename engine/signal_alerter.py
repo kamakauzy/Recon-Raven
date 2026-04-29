@@ -19,6 +19,7 @@ Usage:
     ./signal_alerter.py -f 433.92 --beep         # ISM + audible alert
     ./signal_alerter.py -f 915 --command "echo LORA >> /tmp/hits.log"
 """
+
 import argparse
 import os
 import shutil
@@ -41,8 +42,8 @@ class SignalAlerter:
         self.command = args.command
         self.logfile = args.log
         self.quiet = args.quiet
-        self.device = getattr(args, 'device', 0) or 0
-        self.json_events = getattr(args, 'json_events', False)
+        self.device = getattr(args, "device", 0) or 0
+        self.json_events = getattr(args, "json_events", False)
 
         self._running = True
         self._last_alert_time = 0
@@ -65,23 +66,27 @@ class SignalAlerter:
             write_header = not log_path.exists()
             self._log_fh = open(log_path, "a")
             if write_header:
-                self._log_fh.write("timestamp_utc,freq_mhz,power_db,threshold_db,alert_num\n")
+                self._log_fh.write(
+                    "timestamp_utc,freq_mhz,power_db,threshold_db,alert_num\n"
+                )
                 self._log_fh.flush()
 
     def run(self):
         """Main monitoring loop."""
-        print(f"╔═══════════════════════════════════════════════╗")
-        print(f"║  Signal Alerter                               ║")
-        print(f"╠═══════════════════════════════════════════════╣")
+        print("╔═══════════════════════════════════════════════╗")
+        print("║  Signal Alerter                               ║")
+        print("╠═══════════════════════════════════════════════╣")
         print(f"║  Freq:      {self.freq:>9.4f} MHz                   ║")
         print(f"║  Threshold: {self.threshold:>9.1f} dB                    ║")
         print(f"║  Cooldown:  {self.cooldown:>9.0f} s                     ║")
         print(f"║  Interval:  {self.interval:>9.1f} s                     ║")
-        print(f"║  Beep:      {'ON' if self.beep else 'OFF':>9}                       ║")
-        notify_str = 'ON' if self._has_notify else 'N/A'
+        print(
+            f"║  Beep:      {'ON' if self.beep else 'OFF':>9}                       ║"
+        )
+        notify_str = "ON" if self._has_notify else "N/A"
         print(f"║  Notify:    {notify_str:>9}                       ║")
-        print(f"╚═══════════════════════════════════════════════╝")
-        print(f"Watching for signals... Ctrl+C to stop.\n")
+        print("╚═══════════════════════════════════════════════╝")
+        print("Watching for signals... Ctrl+C to stop.\n")
 
         while self._running:
             try:
@@ -98,9 +103,15 @@ class SignalAlerter:
                             self._fire_alert(power)
                             self._last_alert_time = now
                         elif not self.quiet:
-                            print(f"[{ts}] Signal {power:.1f} dB (cooldown active)", flush=True)
+                            print(
+                                f"[{ts}] Signal {power:.1f} dB (cooldown active)",
+                                flush=True,
+                            )
                     elif not self.quiet:
-                        print(f"[{ts}] scan #{self._scan_count:>4d}  power={power:.1f} dB  (below threshold)", flush=True)
+                        print(
+                            f"[{ts}] scan #{self._scan_count:>4d}  power={power:.1f} dB  (below threshold)",
+                            flush=True,
+                        )
 
                 time.sleep(self.interval)
 
@@ -122,18 +133,20 @@ class SignalAlerter:
 
         cmd = [
             "rtl_power",
-            "-f", f"{f_low}:{f_high}:{bw}",
-            "-i", "1",
-            "-g", str(self.gain),
-            "-d", str(self.device),
+            "-f",
+            f"{f_low}:{f_high}:{bw}",
+            "-i",
+            "1",
+            "-g",
+            str(self.gain),
+            "-d",
+            str(self.device),
             "-1",  # single shot
-            "-"    # output to stdout
+            "-",  # output to stdout
         ]
 
         try:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=15
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             if result.returncode != 0:
                 return None
 
@@ -163,19 +176,26 @@ class SignalAlerter:
         ts_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         # Console alert
-        print(f"[{ts}] *** ALERT #{self._alert_count} *** "
-              f"Signal detected: {power:.1f} dB @ {self.freq:.4f} MHz", flush=True)
+        print(
+            f"[{ts}] *** ALERT #{self._alert_count} *** "
+            f"Signal detected: {power:.1f} dB @ {self.freq:.4f} MHz",
+            flush=True,
+        )
 
         # Desktop notification
         if self._has_notify:
             try:
-                subprocess.Popen([
-                    "notify-send",
-                    "--urgency=critical",
-                    f"RF ALERT — {self.freq} MHz",
-                    f"Signal: {power:.1f} dB (threshold: {self.threshold:.1f} dB)\n"
-                    f"Alert #{self._alert_count} at {ts}",
-                ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen(
+                    [
+                        "notify-send",
+                        "--urgency=critical",
+                        f"RF ALERT — {self.freq} MHz",
+                        f"Signal: {power:.1f} dB (threshold: {self.threshold:.1f} dB)\n"
+                        f"Alert #{self._alert_count} at {ts}",
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
             except Exception:
                 pass
 
@@ -185,14 +205,19 @@ class SignalAlerter:
                 # Try multiple beep methods
                 if shutil.which("paplay"):
                     subprocess.Popen(
-                        ["paplay", "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                        [
+                            "paplay",
+                            "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga",
+                        ],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
                     )
                 elif shutil.which("aplay"):
                     # Generate a quick beep via aplay
                     subprocess.Popen(
                         ["bash", "-c", "echo -ne '\\a'"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
                     )
                 else:
                     print("\a", end="", flush=True)  # terminal bell
@@ -201,7 +226,9 @@ class SignalAlerter:
 
         # Log to file
         if self._log_fh:
-            self._log_fh.write(f"{ts_utc},{self.freq:.4f},{power:.1f},{self.threshold:.1f},{self._alert_count}\n")
+            self._log_fh.write(
+                f"{ts_utc},{self.freq:.4f},{power:.1f},{self.threshold:.1f},{self._alert_count}\n"
+            )
             self._log_fh.flush()
 
         # Custom command
@@ -213,8 +240,11 @@ class SignalAlerter:
                 env["ALERT_NUM"] = str(self._alert_count)
                 env["ALERT_TIME"] = ts_utc
                 subprocess.Popen(
-                    self.command, shell=True, env=env,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                    self.command,
+                    shell=True,
+                    env=env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
             except Exception as e:
                 print(f"[WARN] Command failed: {e}", file=sys.stderr)
@@ -222,6 +252,7 @@ class SignalAlerter:
         # JSON event line (for capture_service integration)
         if self.json_events:
             import json
+
             event = {
                 "event_type": "alert",
                 "timestamp": ts_utc,
@@ -259,29 +290,60 @@ Chain with other tools:
   %(prog)s -f 433.92 --command "python3 scripts/squelch_recorder.py -f 433.92 --max 30"
         """,
     )
-    parser.add_argument("-f", "--freq", type=float, required=True,
-                        help="Target frequency in MHz")
-    parser.add_argument("-s", "--threshold", type=float, default=-40,
-                        help="Alert threshold in dB (default: -40)")
-    parser.add_argument("-g", "--gain", type=float, default=38,
-                        help="RF gain (default: 38)")
-    parser.add_argument("-i", "--interval", type=float, default=5,
-                        help="Scan interval in seconds (default: 5)")
-    parser.add_argument("--cooldown", type=float, default=30,
-                        help="Minimum seconds between alerts (default: 30)")
-    parser.add_argument("--beep", action="store_true",
-                        help="Play audible alert sound")
-    parser.add_argument("--command", type=str, default=None,
-                        help="Shell command to execute on alert (receives env vars)")
-    parser.add_argument("--log", type=str,
-                        default=os.path.expanduser("~/SIGINT/logs/alerts.csv"),
-                        help="Alert log CSV path (default: ~/SIGINT/logs/alerts.csv)")
-    parser.add_argument("-q", "--quiet", action="store_true",
-                        help="Only print alerts, suppress routine scan output")
-    parser.add_argument("-d", "--device", type=int, default=0,
-                        help="RTL-SDR device index (default: 0)")
-    parser.add_argument("--json-events", dest="json_events", action="store_true",
-                        help="Emit JSON event lines on stdout for integration")
+    parser.add_argument(
+        "-f", "--freq", type=float, required=True, help="Target frequency in MHz"
+    )
+    parser.add_argument(
+        "-s",
+        "--threshold",
+        type=float,
+        default=-40,
+        help="Alert threshold in dB (default: -40)",
+    )
+    parser.add_argument(
+        "-g", "--gain", type=float, default=38, help="RF gain (default: 38)"
+    )
+    parser.add_argument(
+        "-i",
+        "--interval",
+        type=float,
+        default=5,
+        help="Scan interval in seconds (default: 5)",
+    )
+    parser.add_argument(
+        "--cooldown",
+        type=float,
+        default=30,
+        help="Minimum seconds between alerts (default: 30)",
+    )
+    parser.add_argument("--beep", action="store_true", help="Play audible alert sound")
+    parser.add_argument(
+        "--command",
+        type=str,
+        default=None,
+        help="Shell command to execute on alert (receives env vars)",
+    )
+    parser.add_argument(
+        "--log",
+        type=str,
+        default=os.path.expanduser("~/SIGINT/logs/alerts.csv"),
+        help="Alert log CSV path (default: ~/SIGINT/logs/alerts.csv)",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Only print alerts, suppress routine scan output",
+    )
+    parser.add_argument(
+        "-d", "--device", type=int, default=0, help="RTL-SDR device index (default: 0)"
+    )
+    parser.add_argument(
+        "--json-events",
+        dest="json_events",
+        action="store_true",
+        help="Emit JSON event lines on stdout for integration",
+    )
 
     args = parser.parse_args()
 

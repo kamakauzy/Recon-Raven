@@ -5,6 +5,7 @@ between Recon-Raven nodes.
 Each node advertises itself via UDP multicast and shares events/alerts
 over a lightweight HTTP API.
 """
+
 import asyncio
 import json
 import logging
@@ -26,6 +27,7 @@ PEER_TIMEOUT = 45  # seconds without beacon → stale
 
 class FederationPeer:
     """Represents a remote Raven node."""
+
     def __init__(self, node_id: str, host: str, port: int, version: str = ""):
         self.node_id = node_id
         self.host = host
@@ -52,8 +54,7 @@ class FederationPeer:
             "version": self.version,
             "last_seen": self.last_seen,
             "alive": self.is_alive,
-            "gps": {"lat": self.gps_lat, "lon": self.gps_lon}
-                  if self.gps_lat else None,
+            "gps": {"lat": self.gps_lat, "lon": self.gps_lon} if self.gps_lat else None,
             "device_count": self.device_count,
         }
 
@@ -68,8 +69,7 @@ class FederationService:
         self._beacon_task: Optional[asyncio.Task] = None
         self._listener_task: Optional[asyncio.Task] = None
         self._sock: Optional[socket.socket] = None
-        self._enabled = getattr(getattr(settings, "federation", None),
-                                "enabled", False)
+        self._enabled = getattr(getattr(settings, "federation", None), "enabled", False)
 
     @property
     def is_enabled(self) -> bool:
@@ -83,24 +83,28 @@ class FederationService:
         self._running = True
 
         # Create multicast UDP socket
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
-                                   socket.IPPROTO_UDP)
+        self._sock = socket.socket(
+            socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP
+        )
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         # Bind to multicast port
         self._sock.bind(("", MCAST_PORT))
 
         # Join multicast group
-        mreq = struct.pack("4sL", socket.inet_aton(MCAST_GROUP),
-                           socket.INADDR_ANY)
+        mreq = struct.pack("4sL", socket.inet_aton(MCAST_GROUP), socket.INADDR_ANY)
         self._sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
         self._sock.setblocking(False)
 
         self._beacon_task = asyncio.create_task(self._beacon_loop())
         self._listener_task = asyncio.create_task(self._listen_loop())
 
-        logger.info("Federation started — node=%s, multicast=%s:%d",
-                     self._node_id, MCAST_GROUP, MCAST_PORT)
+        logger.info(
+            "Federation started — node=%s, multicast=%s:%d",
+            self._node_id,
+            MCAST_GROUP,
+            MCAST_PORT,
+        )
 
     async def stop(self):
         self._running = False
@@ -115,11 +119,16 @@ class FederationService:
     def get_peers(self) -> List[dict]:
         """Return all known peers."""
         # Prune stale
-        stale = [nid for nid, p in self._peers.items()
-                 if not p.is_alive]
+        stale = [nid for nid, p in self._peers.items() if not p.is_alive]
         for nid in stale:
             del self._peers[nid]
         return [p.to_dict() for p in self._peers.values()]
+
+    def add_peer(self, node_id: str, host: str, port: int) -> dict:
+        """Manually add a peer node."""
+        peer = FederationPeer(node_id=node_id, host=host, port=port)
+        self._peers[node_id] = peer
+        return peer.to_dict()
 
     def get_status(self) -> dict:
         return {
@@ -154,8 +163,7 @@ class FederationService:
                         json=payload,
                     )
                 except Exception as e:
-                    logger.debug("Failed to share event with %s: %s",
-                                 peer.node_id, e)
+                    logger.debug("Failed to share event with %s: %s", peer.node_id, e)
 
     async def query_peer(self, node_id: str, endpoint: str) -> Optional[dict]:
         """Query a specific peer's API."""
@@ -176,18 +184,19 @@ class FederationService:
     async def _beacon_loop(self):
         """Periodically send beacon on multicast."""
         loop = asyncio.get_event_loop()
-        send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM,
-                                  socket.IPPROTO_UDP)
+        send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         send_sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
 
         while self._running:
             try:
-                beacon = json.dumps({
-                    "node_id": self._node_id,
-                    "port": self._port,
-                    "version": "0.1.0",
-                    "ts": time.time(),
-                }).encode()
+                beacon = json.dumps(
+                    {
+                        "node_id": self._node_id,
+                        "port": self._port,
+                        "version": "0.1.0",
+                        "ts": time.time(),
+                    }
+                ).encode()
 
                 await loop.run_in_executor(
                     None,
@@ -207,7 +216,8 @@ class FederationService:
         while self._running:
             try:
                 data, addr = await loop.run_in_executor(
-                    None, lambda: self._sock.recvfrom(1024),
+                    None,
+                    lambda: self._sock.recvfrom(1024),
                 )
                 msg = json.loads(data.decode())
                 node_id = msg.get("node_id", "")
@@ -223,11 +233,9 @@ class FederationService:
                     self._peers[node_id].last_seen = time.time()
                     self._peers[node_id].version = msg.get("version", "")
                 else:
-                    peer = FederationPeer(node_id, host, port,
-                                          msg.get("version", ""))
+                    peer = FederationPeer(node_id, host, port, msg.get("version", ""))
                     self._peers[node_id] = peer
-                    logger.info("New peer discovered: %s @ %s:%d",
-                                 node_id, host, port)
+                    logger.info("New peer discovered: %s @ %s:%d", node_id, host, port)
 
             except BlockingIOError:
                 await asyncio.sleep(0.5)

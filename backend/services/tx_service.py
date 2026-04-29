@@ -7,14 +7,13 @@ All transmissions go through safety gates:
   - Duration limit (hardware kill after timeout)
   - Full audit log (every attempt logged, success and rejected)
 """
+
 import asyncio
 import logging
 import os
-import struct
 import tempfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 
@@ -81,7 +80,10 @@ class TXService:
 
         # Gate 4: Duration limit
         if req.duration_s > self._max_duration:
-            return False, f"Duration {req.duration_s}s exceeds max {self._max_duration}s"
+            return (
+                False,
+                f"Duration {req.duration_s}s exceeds max {self._max_duration}s",
+            )
 
         # Gate 5: RF amp requires explicit flag
         if req.rf_amp:
@@ -98,8 +100,12 @@ class TXService:
         await self._log_tx(req, ok, reason)
 
         if not ok:
-            logger.warning("TX REJECTED: %s (freq=%d Hz, gain=%d dB)",
-                          reason, req.freq_hz, req.gain_db)
+            logger.warning(
+                "TX REJECTED: %s (freq=%d Hz, gain=%d dB)",
+                reason,
+                req.freq_hz,
+                req.gain_db,
+            )
             return {"status": "rejected", "reason": reason}
 
         # Find HackRF
@@ -122,15 +128,24 @@ class TXService:
             # Execute hackrf_transfer
             cmd = [
                 "hackrf_transfer",
-                "-t", iq_path,
-                "-f", str(req.freq_hz),
-                "-s", str(req.sample_rate),
-                "-x", str(req.gain_db),
+                "-t",
+                iq_path,
+                "-f",
+                str(req.freq_hz),
+                "-s",
+                str(req.sample_rate),
+                "-x",
+                str(req.gain_db),
             ]
 
             self._tx_count += 1
-            logger.info("TX #%d START: %d Hz, %d dB, %.1fs",
-                       self._tx_count, req.freq_hz, req.gain_db, req.duration_s)
+            logger.info(
+                "TX #%d START: %d Hz, %d dB, %.1fs",
+                self._tx_count,
+                req.freq_hz,
+                req.gain_db,
+                req.duration_s,
+            )
 
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -190,15 +205,24 @@ class TXService:
             # FM carrier with 1kHz tone
             mod_freq = 1000
             deviation = 5000
-            phase = 2 * np.pi * deviation * np.cumsum(np.sin(2 * np.pi * mod_freq * t)) / req.sample_rate
+            phase = (
+                2
+                * np.pi
+                * deviation
+                * np.cumsum(np.sin(2 * np.pi * mod_freq * t))
+                / req.sample_rate
+            )
             iq = (0.5 * np.exp(1j * phase)).astype(np.complex64)
 
         elif req.waveform == "sweep":
             # Swept tone for DF calibration
             sweep_bw = 100000  # 100 kHz sweep
-            phase = 2 * np.pi * np.cumsum(
-                np.linspace(-sweep_bw/2, sweep_bw/2, num_samples)
-            ) / req.sample_rate
+            phase = (
+                2
+                * np.pi
+                * np.cumsum(np.linspace(-sweep_bw / 2, sweep_bw / 2, num_samples))
+                / req.sample_rate
+            )
             iq = (0.5 * np.exp(1j * phase)).astype(np.complex64)
 
         else:
@@ -238,7 +262,6 @@ class TXService:
             "max_gain_db": self._max_gain,
             "max_duration_s": self._max_duration,
             "authorized_bands": [
-                {"low_mhz": b[0], "high_mhz": b[1]}
-                for b in self._authorized_bands
+                {"low_mhz": b[0], "high_mhz": b[1]} for b in self._authorized_bands
             ],
         }

@@ -1,7 +1,5 @@
 """Tile proxy — serves OSM tiles through the local server to avoid CORS/CSP issues."""
-import asyncio
-import hashlib
-import os
+
 from pathlib import Path
 
 import aiohttp
@@ -14,6 +12,7 @@ TILE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 TILE_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 SUBDOMAINS = ["a", "b", "c"]
+
 
 @router.get("/tiles/{z}/{x}/{y}.png")
 async def proxy_tile(z: int, x: int, y: int):
@@ -33,8 +32,11 @@ async def proxy_tile(z: int, x: int, y: int):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10),
-                                   headers={"User-Agent": "Recon-Raven/0.1"}) as resp:
+            async with session.get(
+                url,
+                timeout=aiohttp.ClientTimeout(total=10),
+                headers={"User-Agent": "Recon-Raven/0.1"},
+            ) as resp:
                 if resp.status == 200:
                     data = await resp.read()
                     # Cache to disk

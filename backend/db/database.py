@@ -1,6 +1,7 @@
 """
 Database engine and session factory — SQLite with WAL mode.
 """
+
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
@@ -36,6 +37,7 @@ def get_session_factory(db_path: str) -> async_sessionmaker[AsyncSession]:
 async def init_db(db_path: str):
     """Create all tables."""
     from .models import Base
+
     engine = get_engine(db_path)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

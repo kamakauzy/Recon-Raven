@@ -1,10 +1,10 @@
 """
 Scheduler — APScheduler-based cron jobs for baselines, diffs, reports, health checks.
 """
+
 import asyncio
 import logging
 import os
-import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,14 +32,15 @@ class RavenScheduler:
     def start(self):
         """Register all scheduled jobs and start the scheduler."""
         sched_cfg = self._settings.scheduler
-        cap_cfg = self._settings.capture
 
         # Baseline capture — default every 6 hours
         cron_parts = sched_cfg.baseline_cron.split()
         if len(cron_parts) == 5:
             trigger = CronTrigger(
-                minute=cron_parts[0], hour=cron_parts[1],
-                day=cron_parts[2], month=cron_parts[3],
+                minute=cron_parts[0],
+                hour=cron_parts[1],
+                day=cron_parts[2],
+                month=cron_parts[3],
                 day_of_week=cron_parts[4],
             )
         else:
@@ -56,7 +57,9 @@ class RavenScheduler:
         # Health check — every N seconds
         self._scheduler.add_job(
             self._run_health_check,
-            trigger=IntervalTrigger(seconds=self._settings.devices.health_check_interval),
+            trigger=IntervalTrigger(
+                seconds=self._settings.devices.health_check_interval
+            ),
             id="health_check",
             name="Device health check",
             replace_existing=True,
@@ -66,8 +69,10 @@ class RavenScheduler:
         report_parts = sched_cfg.report_cron.split()
         if len(report_parts) == 5 and sched_cfg.auto_report:
             report_trigger = CronTrigger(
-                minute=report_parts[0], hour=report_parts[1],
-                day=report_parts[2], month=report_parts[3],
+                minute=report_parts[0],
+                hour=report_parts[1],
+                day=report_parts[2],
+                month=report_parts[3],
                 day_of_week=report_parts[4],
             )
             self._scheduler.add_job(
@@ -90,12 +95,16 @@ class RavenScheduler:
         """Return list of scheduled jobs as dicts."""
         jobs = []
         for job in self._scheduler.get_jobs():
-            jobs.append({
-                "id": job.id,
-                "name": job.name,
-                "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-                "paused": job.next_run_time is None,
-            })
+            jobs.append(
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run": job.next_run_time.isoformat()
+                    if job.next_run_time
+                    else None,
+                    "paused": job.next_run_time is None,
+                }
+            )
         return jobs
 
     def trigger_job(self, job_id: str):
@@ -139,9 +148,12 @@ class RavenScheduler:
         cmd = [
             "rtl_433",
             *freq_args,
-            "-d", str(free_dev.index),
-            "-F", f"csv:{out_file}",
-            "-T", str(sched_cfg.baseline_duration),
+            "-d",
+            str(free_dev.index),
+            "-F",
+            f"csv:{out_file}",
+            "-T",
+            str(sched_cfg.baseline_duration),
         ]
 
         # Mark device busy
@@ -160,7 +172,9 @@ class RavenScheduler:
             )
 
             if proc.returncode != 0:
-                logger.error("Baseline capture failed: %s", stderr.decode(errors="replace")[:500])
+                logger.error(
+                    "Baseline capture failed: %s", stderr.decode(errors="replace")[:500]
+                )
                 return
 
             # Count lines in output
@@ -200,6 +214,7 @@ class RavenScheduler:
         session_factory = get_session_factory(self._db_path)
         async with session_factory() as session:
             from sqlalchemy import select
+
             result = await session.execute(
                 select(Baseline).order_by(Baseline.timestamp.desc()).limit(2)
             )
@@ -219,9 +234,12 @@ class RavenScheduler:
         # Run baseline_diff.py
         diff_script = os.path.join(self._engine_dir, "baseline_diff.py")
         cmd = [
-            "/usr/bin/python3", diff_script,
-            "--old", old_file,
-            "--new", new_file,
+            "/usr/bin/python3",
+            diff_script,
+            "--old",
+            old_file,
+            "--new",
+            new_file,
         ]
 
         try:
@@ -254,8 +272,13 @@ class RavenScheduler:
                 session.add(diff)
                 await session.commit()
 
-            logger.info("Baseline diff: +%d new, -%d gone, %d power, %d rate",
-                        new_signals, disappeared, power_changes, rate_changes)
+            logger.info(
+                "Baseline diff: +%d new, -%d gone, %d power, %d rate",
+                new_signals,
+                disappeared,
+                power_changes,
+                rate_changes,
+            )
 
         except Exception as e:
             logger.error("Baseline diff error: %s", e)
@@ -270,10 +293,14 @@ class RavenScheduler:
 
         report_script = os.path.join(self._engine_dir, "intel_packager.py")
         cmd = [
-            "/usr/bin/python3", report_script,
-            "--log-dir", cap_cfg.log_dir,
-            "--baseline-dir", cap_cfg.baseline_dir,
-            "--output", report_file,
+            "/usr/bin/python3",
+            report_script,
+            "--log-dir",
+            cap_cfg.log_dir,
+            "--baseline-dir",
+            cap_cfg.baseline_dir,
+            "--output",
+            report_file,
         ]
 
         try:
@@ -285,7 +312,10 @@ class RavenScheduler:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
 
             if proc.returncode != 0:
-                logger.error("Report generation failed: %s", stderr.decode(errors="replace")[:500])
+                logger.error(
+                    "Report generation failed: %s",
+                    stderr.decode(errors="replace")[:500],
+                )
                 return
 
             # Persist report record
@@ -310,7 +340,9 @@ class RavenScheduler:
             results = await self._dm.health_check_all()
             unhealthy = [r for r in results if not r.get("healthy", True)]
             if unhealthy:
-                logger.warning("Unhealthy devices: %s",
-                              ", ".join(str(r.get("sdr_index")) for r in unhealthy))
+                logger.warning(
+                    "Unhealthy devices: %s",
+                    ", ".join(str(r.get("sdr_index")) for r in unhealthy),
+                )
         except Exception as e:
             logger.error("Health check error: %s", e)

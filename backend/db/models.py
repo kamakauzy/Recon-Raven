@@ -1,10 +1,18 @@
 """
 SQLAlchemy ORM models for Recon-Raven.
 """
+
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
     JSON,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -54,7 +62,9 @@ class Event(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
-    event_type = Column(String(32), nullable=False, index=True)  # burst | alert | baseline_new | capture_start | capture_stop
+    event_type = Column(
+        String(32), nullable=False, index=True
+    )  # burst | alert | baseline_new | capture_start | capture_stop
     freq_mhz = Column(Float, nullable=True)
     duration_ms = Column(Float, nullable=True)
     peak_power_db = Column(Float, nullable=True)
@@ -65,7 +75,9 @@ class Event(Base):
 
     device = relationship("Device", back_populates="events")
     gps_fix = relationship("GPSFix", back_populates="events")
-    classification = relationship("Classification", back_populates="event", uselist=False)
+    classification = relationship(
+        "Classification", back_populates="event", uselist=False
+    )
 
 
 class Baseline(Base):
@@ -84,8 +96,16 @@ class Baseline(Base):
     device = relationship("Device", back_populates="baselines")
     gps_fix = relationship("GPSFix", back_populates="baselines")
 
-    diffs_as_old = relationship("BaselineDiff", foreign_keys="BaselineDiff.old_baseline_id", back_populates="old_baseline")
-    diffs_as_new = relationship("BaselineDiff", foreign_keys="BaselineDiff.new_baseline_id", back_populates="new_baseline")
+    diffs_as_old = relationship(
+        "BaselineDiff",
+        foreign_keys="BaselineDiff.old_baseline_id",
+        back_populates="old_baseline",
+    )
+    diffs_as_new = relationship(
+        "BaselineDiff",
+        foreign_keys="BaselineDiff.new_baseline_id",
+        back_populates="new_baseline",
+    )
 
 
 class BaselineDiff(Base):
@@ -101,8 +121,12 @@ class BaselineDiff(Base):
     rate_changes = Column(Integer, default=0)
     report_text = Column(Text, default="")
 
-    old_baseline = relationship("Baseline", foreign_keys=[old_baseline_id], back_populates="diffs_as_old")
-    new_baseline = relationship("Baseline", foreign_keys=[new_baseline_id], back_populates="diffs_as_new")
+    old_baseline = relationship(
+        "Baseline", foreign_keys=[old_baseline_id], back_populates="diffs_as_old"
+    )
+    new_baseline = relationship(
+        "Baseline", foreign_keys=[new_baseline_id], back_populates="diffs_as_new"
+    )
 
 
 class Classification(Base):

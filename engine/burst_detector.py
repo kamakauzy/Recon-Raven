@@ -17,6 +17,7 @@ Usage:
     ./burst_detector.py -f 433.92 --record         # also capture IQ per burst
     ./burst_detector.py -f 462.5625 --log bursts.csv
 """
+
 import argparse
 import csv
 import math
@@ -32,7 +33,9 @@ try:
     from gnuradio import gr, blocks, analog
     import osmosdr
 except ImportError:
-    print("[FATAL] GNU Radio not found. Install gnuradio + gr-osmosdr.", file=sys.stderr)
+    print(
+        "[FATAL] GNU Radio not found. Install gnuradio + gr-osmosdr.", file=sys.stderr
+    )
     sys.exit(1)
 
 
@@ -60,10 +63,10 @@ class BurstDetector(gr.top_block):
         self._current_sink = None
         self._current_file = None
 
-        self.json_events = getattr(args, 'json_events', False)
+        self.json_events = getattr(args, "json_events", False)
 
         # ── Source ──
-        device_index = getattr(args, 'device', 0) or 0
+        device_index = getattr(args, "device", 0) or 0
         self.source = osmosdr.source(args=f"rtl={device_index}")
         self.source.set_sample_rate(self.samp_rate)
         self.source.set_center_freq(self.freq)
@@ -97,10 +100,15 @@ class BurstDetector(gr.top_block):
             self._csv_file = open(log_path, "a", newline="")
             self._csv_writer = csv.writer(self._csv_file)
             if write_header:
-                self._csv_writer.writerow([
-                    "timestamp_utc", "freq_mhz", "duration_ms",
-                    "peak_power_db", "iq_file"
-                ])
+                self._csv_writer.writerow(
+                    [
+                        "timestamp_utc",
+                        "freq_mhz",
+                        "duration_ms",
+                        "peak_power_db",
+                        "iq_file",
+                    ]
+                )
 
     def start(self, *a, **kw):
         super().start(*a, **kw)
@@ -131,7 +139,9 @@ class BurstDetector(gr.top_block):
                     elif now - self._burst_start > 60:
                         # Safety: cap burst at 60s (continuous signal, not a burst)
                         self._end_burst()
-                        self._log("  (Capped at 60s — likely continuous signal, not burst)")
+                        self._log(
+                            "  (Capped at 60s — likely continuous signal, not burst)"
+                        )
 
                 time.sleep(0.02)  # 20ms polling — fast enough for sub-100ms bursts
             except Exception as e:
@@ -152,7 +162,9 @@ class BurstDetector(gr.top_block):
             self.lock()
             try:
                 self.disconnect(self.valve, self._null_sink)
-                self._current_sink = blocks.file_sink(gr.sizeof_gr_complex, str(fpath), False)
+                self._current_sink = blocks.file_sink(
+                    gr.sizeof_gr_complex, str(fpath), False
+                )
                 self._current_sink.set_unbuffered(True)
                 self.connect(self.valve, self._current_sink)
                 self.valve.set_enabled(True)
@@ -204,16 +216,21 @@ class BurstDetector(gr.top_block):
 
             # CSV log
             if self._csv_writer:
-                self._csv_writer.writerow([
-                    ts_utc, f"{freq_mhz:.4f}",
-                    f"{duration_ms:.1f}", f"{self._burst_peak:.1f}",
-                    iq_file
-                ])
+                self._csv_writer.writerow(
+                    [
+                        ts_utc,
+                        f"{freq_mhz:.4f}",
+                        f"{duration_ms:.1f}",
+                        f"{self._burst_peak:.1f}",
+                        iq_file,
+                    ]
+                )
                 self._csv_file.flush()
 
             # JSON event line (for capture_service integration)
             if self.json_events:
                 import json
+
                 event = {
                     "event_type": "burst",
                     "timestamp": ts_utc,
@@ -250,27 +267,59 @@ Output CSV columns: timestamp_utc, freq_mhz, duration_ms, peak_power_db, iq_file
 Feed the CSV into baseline_diff.py or intel_packager.py for F3EAD analysis.
         """,
     )
-    parser.add_argument("-f", "--freq", type=float, default=433.92,
-                        help="Center frequency in MHz (default: 433.92)")
-    parser.add_argument("-s", "--squelch", type=float, default=-40,
-                        help="Squelch threshold in dB (default: -40)")
-    parser.add_argument("-g", "--gain", type=float, default=38,
-                        help="RF gain (default: 38)")
-    parser.add_argument("-r", "--rate", type=float, default=2.4,
-                        help="Sample rate in Msps (default: 2.4)")
-    parser.add_argument("-o", "--output", type=str,
-                        default=os.path.expanduser("~/SIGINT/recordings"),
-                        help="Output directory for IQ captures (default: ~/SIGINT/recordings)")
-    parser.add_argument("--record", action="store_true",
-                        help="Record IQ data for each burst")
-    parser.add_argument("--log", type=str, default=None,
-                        help="Append burst log to CSV file")
-    parser.add_argument("--min-burst", dest="min_burst", type=float, default=0.02,
-                        help="Minimum burst duration in seconds (default: 0.02)")
-    parser.add_argument("-d", "--device", type=int, default=0,
-                        help="RTL-SDR device index (default: 0)")
-    parser.add_argument("--json-events", dest="json_events", action="store_true",
-                        help="Emit JSON event lines on stdout for integration")
+    parser.add_argument(
+        "-f",
+        "--freq",
+        type=float,
+        default=433.92,
+        help="Center frequency in MHz (default: 433.92)",
+    )
+    parser.add_argument(
+        "-s",
+        "--squelch",
+        type=float,
+        default=-40,
+        help="Squelch threshold in dB (default: -40)",
+    )
+    parser.add_argument(
+        "-g", "--gain", type=float, default=38, help="RF gain (default: 38)"
+    )
+    parser.add_argument(
+        "-r",
+        "--rate",
+        type=float,
+        default=2.4,
+        help="Sample rate in Msps (default: 2.4)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default=os.path.expanduser("~/SIGINT/recordings"),
+        help="Output directory for IQ captures (default: ~/SIGINT/recordings)",
+    )
+    parser.add_argument(
+        "--record", action="store_true", help="Record IQ data for each burst"
+    )
+    parser.add_argument(
+        "--log", type=str, default=None, help="Append burst log to CSV file"
+    )
+    parser.add_argument(
+        "--min-burst",
+        dest="min_burst",
+        type=float,
+        default=0.02,
+        help="Minimum burst duration in seconds (default: 0.02)",
+    )
+    parser.add_argument(
+        "-d", "--device", type=int, default=0, help="RTL-SDR device index (default: 0)"
+    )
+    parser.add_argument(
+        "--json-events",
+        dest="json_events",
+        action="store_true",
+        help="Emit JSON event lines on stdout for integration",
+    )
 
     args = parser.parse_args()
 
@@ -278,16 +327,16 @@ Feed the CSV into baseline_diff.py or intel_packager.py for F3EAD analysis.
     if args.log is None:
         args.log = os.path.expanduser("~/SIGINT/logs/bursts.csv")
 
-    print(f"╔═══════════════════════════════════════════════╗")
-    print(f"║  Burst Detector                               ║")
-    print(f"╠═══════════════════════════════════════════════╣")
+    print("╔═══════════════════════════════════════════════╗")
+    print("║  Burst Detector                               ║")
+    print("╠═══════════════════════════════════════════════╣")
     print(f"║  Freq:      {args.freq:>9.4f} MHz                   ║")
     print(f"║  Squelch:   {args.squelch:>9.1f} dB                    ║")
     print(f"║  Min burst: {args.min_burst * 1000:>9.1f} ms                    ║")
     print(f"║  Recording: {'ON' if args.record else 'OFF':>9}                       ║")
     print(f"║  Log:       {str(args.log):<35}║")
-    print(f"╚═══════════════════════════════════════════════╝")
-    print(f"Monitoring for bursts... Ctrl+C to stop.\n")
+    print("╚═══════════════════════════════════════════════╝")
+    print("Monitoring for bursts... Ctrl+C to stop.\n")
 
     tb = BurstDetector(args)
 

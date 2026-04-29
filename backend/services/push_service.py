@@ -1,6 +1,7 @@
 """
 Push notification service — Web Push API for mobile alerts.
 """
+
 import json
 import logging
 from typing import List
@@ -19,8 +20,9 @@ _VAPID_CLAIMS = {"sub": "mailto:raven@localhost"}
 
 
 class PushService:
-    def __init__(self, db_path: str, vapid_private_key: str = "",
-                 vapid_claims: dict = None):
+    def __init__(
+        self, db_path: str, vapid_private_key: str = "", vapid_claims: dict = None
+    ):
         self._db_path = db_path
         self._private_key = vapid_private_key or _VAPID_PRIVATE_KEY
         self._claims = vapid_claims or _VAPID_CLAIMS
@@ -31,6 +33,7 @@ class PushService:
         session_factory = get_session_factory(self._db_path)
         async with session_factory() as session:
             from sqlalchemy import select
+
             existing = await session.execute(
                 select(PushSubscription).where(PushSubscription.endpoint == endpoint)
             )
@@ -51,14 +54,16 @@ class PushService:
         """Remove a push subscription."""
         session_factory = get_session_factory(self._db_path)
         async with session_factory() as session:
-            from sqlalchemy import select, delete
+            from sqlalchemy import delete
+
             await session.execute(
                 delete(PushSubscription).where(PushSubscription.endpoint == endpoint)
             )
             await session.commit()
 
-    async def send_alert(self, title: str, body: str, url: str = "/",
-                         tag: str = "raven-alert"):
+    async def send_alert(
+        self, title: str, body: str, url: str = "/", tag: str = "raven-alert"
+    ):
         """Send push notification to all subscribers."""
         if not self._private_key:
             logger.debug("Push notifications disabled — no VAPID key")
@@ -67,16 +72,19 @@ class PushService:
         session_factory = get_session_factory(self._db_path)
         async with session_factory() as session:
             from sqlalchemy import select
+
             result = await session.execute(select(PushSubscription))
             subs = result.scalars().all()
 
-        payload = json.dumps({
-            "title": title,
-            "body": body,
-            "url": url,
-            "tag": tag,
-            "icon": "/manifest.json",
-        })
+        payload = json.dumps(
+            {
+                "title": title,
+                "body": body,
+                "url": url,
+                "tag": tag,
+                "icon": "/manifest.json",
+            }
+        )
 
         expired = []
         for sub in subs:
@@ -107,6 +115,7 @@ class PushService:
             session_factory = get_session_factory(self._db_path)
             async with session_factory() as session:
                 from sqlalchemy import delete
+
                 for ep in expired:
                     await session.execute(
                         delete(PushSubscription).where(PushSubscription.endpoint == ep)
@@ -125,6 +134,6 @@ class PushService:
 
         classification = event_data.get("classification", {})
         if classification.get("label") and classification["label"] != "Unknown":
-            body += f"\nClass: {classification['label']} ({classification.get('confidence', 0)*100:.0f}%)"
+            body += f"\nClass: {classification['label']} ({classification.get('confidence', 0) * 100:.0f}%)"
 
         await self.send_alert(title, body, tag=f"signal-{freq}")

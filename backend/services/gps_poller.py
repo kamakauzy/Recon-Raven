@@ -1,6 +1,7 @@
 """
 GPS Poller — connects to gpsd, caches latest fix, persists to database.
 """
+
 import asyncio
 import json
 import logging
@@ -45,8 +46,13 @@ class CachedFix:
 
 
 class GPSPoller:
-    def __init__(self, db_path: str, host: str = "127.0.0.1", port: int = 2947,
-                 poll_interval: float = 2.0):
+    def __init__(
+        self,
+        db_path: str,
+        host: str = "127.0.0.1",
+        port: int = 2947,
+        poll_interval: float = 2.0,
+    ):
         self._db_path = db_path
         self._host = host
         self._port = port
