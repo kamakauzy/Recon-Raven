@@ -139,7 +139,7 @@ class RavenScheduler:
         cmd = [
             "rtl_433",
             *freq_args,
-            "-d", str(free_dev.sdr_index),
+            "-d", str(free_dev.index),
             "-F", f"csv:{out_file}",
             "-T", str(sched_cfg.baseline_duration),
         ]

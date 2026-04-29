@@ -25,6 +25,7 @@ class SDRDevice:
     status: str = "free"  # free | busy | error | offline
     assigned_task: str = ""
     db_id: Optional[int] = None
+    last_seen: Optional[datetime] = None
 
 
 class DeviceManager:
@@ -199,6 +200,13 @@ class DeviceManager:
     def list_devices(self) -> List[SDRDevice]:
         return list(self._devices.values())
 
+    def get_free_device(self, device_type: str = "rtlsdr") -> Optional[SDRDevice]:
+        """Return the first free device of the given type, or None."""
+        for dev in self._devices.values():
+            if dev.device_type == device_type and dev.status == "free":
+                return dev
+        return None
+
     def is_busy(self, sdr_index: int) -> bool:
         lock = self._locks.get(sdr_index)
         return lock.locked() if lock else False
@@ -245,12 +253,17 @@ class DeviceManager:
         except Exception:
             return False
 
-    async def health_check_all(self):
+    async def health_check_all(self) -> List[dict]:
         """Run health check on all devices, update status."""
+        results = []
         for idx, dev in self._devices.items():
             if dev.status == "busy":
+                results.append({"sdr_index": idx, "healthy": True, "status": "busy"})
                 continue
             healthy = await self.health_check(idx)
             dev.status = "free" if healthy else "error"
-            dev.last_seen = datetime.now(timezone.utc) if healthy else dev.last_seen
+            if healthy:
+                dev.last_seen = datetime.now(timezone.utc)
+            results.append({"sdr_index": idx, "healthy": healthy, "status": dev.status})
             logger.debug("Health check device %d (%s): %s", idx, dev.model, dev.status)
+        return results
