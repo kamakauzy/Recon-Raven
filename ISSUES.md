@@ -11,13 +11,13 @@ Feedback evaluation from external review (April 2026). Assessed against current 
 | 1 | README is empty/useless | CRITICAL | **RESOLVED** | Rewritten with arch diagram, API ref, install guide, structure, TX safety |
 | 2 | Repo is scaffolding / no working code | CRITICAL | **RESOLVED** | All 9 phases coded, deployed, verified on Dragon box (potato:8080) |
 | 3 | Scope creep risk | HIGH | OPEN | Code exists but needs field validation per-phase |
-| 4 | No integration docs (rtl_433, URH, GQRX, EMCON) | HIGH | OPEN | Need a INTEGRATION.md or expand README |
+| 4 | No integration docs (rtl_433, URH, GQRX, EMCON) | HIGH | **RESOLVED** | docs/INTEGRATION.md covers all tools + EMCON |
 | 5 | No screenshots / visual proof | MEDIUM | OPEN | Dashboard serves but no captured screenshots |
-| 6 | No one-command install script | MEDIUM | OPEN | Steps documented, no `install.sh` yet |
-| 7 | TX safety disclaimers insufficient | HIGH | PARTIAL | TX Safety Model in README, but no LEGAL/DISCLAIMER banner |
-| 8 | No F3EAD "how this supports the course" section | MEDIUM | OPEN | Reference docs exist but disconnected from README |
+| 6 | No one-command install script | MEDIUM | **RESOLVED** | install.sh with venv, deps, config, systemd |
+| 7 | TX safety disclaimers insufficient | HIGH | **RESOLVED** | LEGAL.md + README warning banner + TX enable confirmation |
+| 8 | No F3EAD "how this supports the course" section | MEDIUM | **RESOLVED** | F3EAD Integration table + Course Day Mapping in README |
 | 9 | No MVP prioritization / phased delivery proof | LOW | **RESOLVED** | Baseline→alert→dashboard→classifier is the actual build order |
-| 10 | Intel package export not linked to templates/ | MEDIUM | OPEN | Template dir exists, scheduler runs intel_packager, but no docs |
+| 10 | Intel package export not linked to templates/ | MEDIUM | **RESOLVED** | templates/README.md with format docs + usage examples |
 
 ---
 
