@@ -1,0 +1,10 @@
+# DMR / P25 / NXDN digital voice
+name: "Digital Voice"
+match:
+  freq_range: [136.0, 174.0, 400.0, 520.0, 764.0, 870.0]
+  burst_duration_range: [500, 60000]  # ms — voice calls
+  bandwidth_khz_range: [6.25, 25.0]
+  modulation: ["4FSK", "CQPSK", "C4FM"]
+models: ["DMR", "P25", "NXDN", "dPMR"]
+priority: 5
+description: "Digital voice protocols — DMR, Project 25, NXDN trunked radio"

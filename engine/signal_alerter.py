@@ -41,6 +41,8 @@ class SignalAlerter:
         self.command = args.command
         self.logfile = args.log
         self.quiet = args.quiet
+        self.device = getattr(args, 'device', 0) or 0
+        self.json_events = getattr(args, 'json_events', False)
 
         self._running = True
         self._last_alert_time = 0
@@ -123,6 +125,7 @@ class SignalAlerter:
             "-f", f"{f_low}:{f_high}:{bw}",
             "-i", "1",
             "-g", str(self.gain),
+            "-d", str(self.device),
             "-1",  # single shot
             "-"    # output to stdout
         ]
@@ -216,6 +219,19 @@ class SignalAlerter:
             except Exception as e:
                 print(f"[WARN] Command failed: {e}", file=sys.stderr)
 
+        # JSON event line (for capture_service integration)
+        if self.json_events:
+            import json
+            event = {
+                "event_type": "alert",
+                "timestamp": ts_utc,
+                "freq_mhz": self.freq,
+                "power_db": round(power, 1),
+                "threshold_db": self.threshold,
+                "alert_num": self._alert_count,
+            }
+            print(json.dumps(event), flush=True)
+
     def _shutdown(self):
         """Clean shutdown."""
         print(f"\n[STOP] {self._alert_count} alert(s) in {self._scan_count} scans.")
@@ -262,6 +278,10 @@ Chain with other tools:
                         help="Alert log CSV path (default: ~/SIGINT/logs/alerts.csv)")
     parser.add_argument("-q", "--quiet", action="store_true",
                         help="Only print alerts, suppress routine scan output")
+    parser.add_argument("-d", "--device", type=int, default=0,
+                        help="RTL-SDR device index (default: 0)")
+    parser.add_argument("--json-events", dest="json_events", action="store_true",
+                        help="Emit JSON event lines on stdout for integration")
 
     args = parser.parse_args()
 

@@ -139,6 +139,14 @@ def set_services(dm, gps, capture):
     _capture_service = capture
 
 
+_scheduler = None
+
+
+def set_scheduler(sched):
+    global _scheduler
+    _scheduler = sched
+
+
 # ── Health ───────────────────────────────────────────────────
 
 @router.get("/health", response_model=HealthOut)
@@ -412,3 +420,318 @@ async def get_report(report_id: int, db: AsyncSession = Depends(get_db)):
         "timestamp": report.timestamp.isoformat() if report.timestamp else "",
         "content": content,
     }
+
+
+# ── Scheduler ────────────────────────────────────────────────
+
+@router.get("/scheduler/jobs")
+async def list_scheduler_jobs():
+    if not _scheduler:
+        return []
+    return _scheduler.get_jobs()
+
+
+@router.post("/scheduler/jobs/{job_id}/trigger")
+async def trigger_scheduler_job(job_id: str):
+    if not _scheduler:
+        raise HTTPException(503, "Scheduler not initialized")
+    try:
+        _scheduler.trigger_job(job_id)
+        return {"job_id": job_id, "triggered": True}
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+
+
+@router.put("/scheduler/jobs/{job_id}/pause")
+async def pause_scheduler_job(job_id: str):
+    if not _scheduler:
+        raise HTTPException(503, "Scheduler not initialized")
+    _scheduler.pause_job(job_id)
+    return {"job_id": job_id, "paused": True}
+
+
+@router.put("/scheduler/jobs/{job_id}/resume")
+async def resume_scheduler_job(job_id: str):
+    if not _scheduler:
+        raise HTTPException(503, "Scheduler not initialized")
+    _scheduler.resume_job(job_id)
+    return {"job_id": job_id, "resumed": True}
+
+
+# ── Direction Finding ────────────────────────────────────────
+
+class DFMeasurementIn(BaseModel):
+    latitude: float
+    longitude: float
+    bearing_deg: float
+    power_db: float = -30.0
+    freq_mhz: float = 433.92
+    confidence: float = 1.0
+
+
+class DFSolveRequest(BaseModel):
+    measurements: list
+
+
+@router.post("/df/solve")
+async def solve_df(req: DFSolveRequest):
+    from ..services.df_solver import DFMeasurement, solve_triangulation
+
+    measurements = []
+    for m in req.measurements:
+        measurements.append(DFMeasurement(
+            latitude=m.get("latitude") if isinstance(m, dict) else m.latitude,
+            longitude=m.get("longitude") if isinstance(m, dict) else m.longitude,
+            bearing_deg=m.get("bearing_deg") if isinstance(m, dict) else m.bearing_deg,
+            power_db=m.get("power_db", -30) if isinstance(m, dict) else getattr(m, "power_db", -30),
+            freq_mhz=m.get("freq_mhz", 433.92) if isinstance(m, dict) else getattr(m, "freq_mhz", 433.92),
+            confidence=m.get("confidence", 1.0) if isinstance(m, dict) else getattr(m, "confidence", 1.0),
+        ))
+
+    if len(measurements) < 2:
+        raise HTTPException(400, "Need at least 2 bearing measurements")
+
+    estimate = solve_triangulation(measurements)
+    if not estimate:
+        raise HTTPException(500, "Triangulation solver failed")
+
+    return {
+        "latitude": estimate.latitude,
+        "longitude": estimate.longitude,
+        "cep_m": estimate.cep_m,
+        "num_bearings": estimate.num_bearings,
+        "residual": estimate.residual,
+    }
+
+
+# ── Classification ───────────────────────────────────────────
+
+@router.get("/classifier/rules")
+async def list_classification_rules():
+    if not _classifier:
+        return []
+    return _classifier.list_rules()
+
+
+@router.post("/classifier/classify")
+async def classify_event(event: dict):
+    if not _classifier:
+        raise HTTPException(503, "Classifier not initialized")
+    result = _classifier.classify(event)
+    return result.to_dict()
+
+
+_classifier = None
+
+
+def set_classifier(cls):
+    global _classifier
+    _classifier = cls
+
+
+# ── TX Control ───────────────────────────────────────────────
+
+_tx_service = None
+
+
+def set_tx_service(tx):
+    global _tx_service
+    _tx_service = tx
+
+
+class TXRequestIn(BaseModel):
+    freq_mhz: float
+    gain_db: int = 20
+    duration_s: float = 5.0
+    waveform: str = ""  # tone, fm, sweep
+    iq_file: str = ""
+    sample_rate: int = 2_000_000
+    operator: str = "dashboard"
+
+
+@router.get("/tx/status")
+async def tx_status():
+    if not _tx_service:
+        return {"enabled": False, "active": False}
+    return _tx_service.get_status()
+
+
+@router.post("/tx/enable")
+async def tx_enable():
+    if not _tx_service:
+        raise HTTPException(503, "TX service not initialized")
+    _tx_service.enable()
+    return {"enabled": True}
+
+
+@router.post("/tx/disable")
+async def tx_disable():
+    if not _tx_service:
+        raise HTTPException(503, "TX service not initialized")
+    _tx_service.disable()
+    return {"enabled": False}
+
+
+@router.post("/tx/transmit")
+async def tx_transmit(req: TXRequestIn):
+    if not _tx_service:
+        raise HTTPException(503, "TX service not initialized")
+
+    from ..services.tx_service import TXRequest
+    tx_req = TXRequest(
+        freq_hz=int(req.freq_mhz * 1e6),
+        gain_db=req.gain_db,
+        duration_s=req.duration_s,
+        sample_rate=req.sample_rate,
+        iq_file=req.iq_file,
+        waveform=req.waveform,
+        operator=req.operator,
+    )
+
+    result = await _tx_service.transmit(tx_req)
+    if result["status"] == "rejected":
+        raise HTTPException(403, result["reason"])
+    return result
+
+
+@router.post("/tx/stop")
+async def tx_stop():
+    if not _tx_service:
+        raise HTTPException(503, "TX service not initialized")
+    stopped = await _tx_service.stop_tx()
+    return {"stopped": stopped}
+
+
+@router.post("/tx/replay")
+async def tx_replay(req: TXRequestIn):
+    """Replay a captured IQ file."""
+    if not _tx_service:
+        raise HTTPException(503, "TX service not initialized")
+    if not req.iq_file:
+        raise HTTPException(400, "iq_file path is required")
+
+    from ..services.tx_service import TXRequest
+    tx_req = TXRequest(
+        freq_hz=int(req.freq_mhz * 1e6),
+        gain_db=req.gain_db,
+        duration_s=req.duration_s,
+        sample_rate=req.sample_rate,
+        iq_file=req.iq_file,
+        operator=req.operator,
+    )
+    result = await _tx_service.transmit(tx_req)
+    if result["status"] == "rejected":
+        raise HTTPException(403, result["reason"])
+    return result
+
+
+# ── FISSURE ──────────────────────────────────────────────────
+
+_fissure_service = None
+
+
+def set_fissure_service(fs):
+    global _fissure_service
+    _fissure_service = fs
+
+
+@router.get("/fissure/status")
+async def fissure_status():
+    if not _fissure_service:
+        return {"available": False}
+    return _fissure_service.get_status()
+
+
+@router.get("/fissure/protocols")
+async def fissure_protocols(search: str = ""):
+    if not _fissure_service:
+        return []
+    return _fissure_service.list_protocols(search)
+
+
+@router.get("/fissure/protocols/query")
+async def fissure_query(
+    freq: float = Query(433.92),
+    modulation: str = Query(""),
+    bandwidth: float = Query(0),
+):
+    if not _fissure_service:
+        return []
+    return _fissure_service.query_protocol(freq, modulation, bandwidth)
+
+
+@router.get("/fissure/flowgraphs/demod")
+async def fissure_demod_flowgraphs(protocol: str = ""):
+    if not _fissure_service:
+        return []
+    return _fissure_service.get_demod_flowgraphs(protocol)
+
+
+@router.get("/fissure/flowgraphs/attack")
+async def fissure_attack_flowgraphs(protocol: str = ""):
+    if not _fissure_service:
+        return []
+    return _fissure_service.get_attack_flowgraphs(protocol)
+
+
+@router.post("/fissure/analyze")
+async def fissure_analyze(iq_file: str = Query(...)):
+    if not _fissure_service:
+        raise HTTPException(503, "FISSURE not available")
+    result = await _fissure_service.run_modulation_detection(iq_file)
+    return result
+
+
+@router.post("/fissure/launch")
+async def fissure_launch(freq_mhz: float = 0, iq_file: str = ""):
+    if not _fissure_service:
+        raise HTTPException(503, "FISSURE not available")
+    context = {"freq_mhz": freq_mhz, "iq_file": iq_file}
+    return await _fissure_service.launch_gui(context)
+
+
+# ── Push Notifications ───────────────────────────────────────
+
+_push_service = None
+
+
+def set_push_service(ps):
+    global _push_service
+    _push_service = ps
+
+
+class PushSubscribeRequest(BaseModel):
+    endpoint: str
+    keys: dict  # {p256dh: str, auth: str}
+
+
+@router.post("/push/subscribe")
+async def push_subscribe(req: PushSubscribeRequest):
+    if not _push_service:
+        raise HTTPException(503, "Push service not initialized")
+    await _push_service.subscribe(
+        endpoint=req.endpoint,
+        p256dh=req.keys.get("p256dh", ""),
+        auth=req.keys.get("auth", ""),
+    )
+    return {"subscribed": True}
+
+
+@router.post("/push/unsubscribe")
+async def push_unsubscribe(endpoint: str = ""):
+    if not _push_service:
+        raise HTTPException(503, "Push service not initialized")
+    await _push_service.unsubscribe(endpoint)
+    return {"unsubscribed": True}
+
+
+@router.post("/push/test")
+async def push_test():
+    """Send a test push notification to all subscribers."""
+    if not _push_service:
+        raise HTTPException(503, "Push service not initialized")
+    await _push_service.send_alert(
+        title="Recon-Raven Test",
+        body="Push notifications are working!",
+    )
+    return {"sent": True}

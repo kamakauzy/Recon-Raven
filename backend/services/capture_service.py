@@ -43,7 +43,7 @@ class CaptureTask:
 
 class CaptureService:
     def __init__(self, engine_dir: str, device_manager, gps_poller, db_path: str,
-                 capture_config):
+                 capture_config, classifier=None):
         self._engine_dir = engine_dir
         self._dm = device_manager
         self._gps = gps_poller
@@ -51,6 +51,7 @@ class CaptureService:
         self._config = capture_config
         self._tasks: Dict[str, CaptureTask] = {}
         self._event_callback: Optional[Callable] = None
+        self._classifier = classifier
 
     def set_event_callback(self, cb: Callable):
         """Set callback for real-time event broadcasting (WebSocket push)."""
@@ -97,11 +98,27 @@ class CaptureService:
         script_path = str(Path(self._engine_dir) / script)
 
         # Use system python3 — GNU Radio + osmosdr are system packages
-        cmd = [
-            "/usr/bin/python3", script_path,
-            "-f", str(task.freq_mhz),
-            "-g", str(kwargs.get("gain", self._config.default_gain)),
-        ]
+        # power_sweep (power_logger) uses different args than GNU Radio scripts
+        if task.task_type == "power_sweep":
+            cmd = [
+                "/usr/bin/python3", script_path,
+                "-l", str(kwargs.get("freq_low", task.freq_mhz - 5)),
+                "-u", str(kwargs.get("freq_high", task.freq_mhz + 5)),
+                "-g", str(kwargs.get("gain", self._config.default_gain)),
+                "-o", self._config.log_dir,
+                "--device", str(task.sdr_index),
+                "--json-events",
+            ]
+            if duration > 0:
+                cmd.extend(["--duration", str(duration)])
+        else:
+            cmd = [
+                "/usr/bin/python3", script_path,
+                "-f", str(task.freq_mhz),
+                "-g", str(kwargs.get("gain", self._config.default_gain)),
+                "-d", str(task.sdr_index),
+                "--json-events",
+            ]
 
         # Task-specific args
         if task.task_type == "burst_detect":
@@ -115,15 +132,6 @@ class CaptureService:
             out_dir = os.path.join(self._config.output_dir, f"squelch_{ts}")
             cmd.extend(["-o", out_dir, "--headless"])
             task.output_file = out_dir
-
-        elif task.task_type == "power_sweep":
-            cmd.extend([
-                "-l", str(kwargs.get("freq_low", task.freq_mhz - 5)),
-                "-u", str(kwargs.get("freq_high", task.freq_mhz + 5)),
-                "-o", self._config.log_dir,
-            ])
-            if duration > 0:
-                cmd.extend(["--duration", str(duration)])
 
         elif task.task_type == "signal_alert":
             log_file = os.path.join(
@@ -234,16 +242,24 @@ class CaptureService:
             dev = self._dm.get_device(task.sdr_index)
 
             event = Event(
-                event_type=event_data.get("type", task.task_type),
+                event_type=event_data.get("event_type", task.task_type),
                 freq_mhz=event_data.get("freq_mhz", task.freq_mhz),
                 duration_ms=event_data.get("duration_ms"),
-                peak_power_db=event_data.get("peak_power_db"),
+                peak_power_db=event_data.get("peak_power_db", event_data.get("power_db")),
                 device_id=dev.db_id if dev else None,
                 gps_fix_id=gps_fix_id,
                 metadata_=event_data,
             )
             session.add(event)
             await session.commit()
+
+        # Classify the event
+        if self._classifier and event_data.get("event_type") != "spectrum":
+            try:
+                result = self._classifier.classify(event_data)
+                event_data["classification"] = result.to_dict()
+            except Exception as e:
+                logger.debug("Classification failed: %s", e)
 
         # Broadcast via WebSocket callback
         if self._event_callback:

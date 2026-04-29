@@ -1,0 +1,11 @@
+# Weather sensors — ISM 433 MHz band
+name: "ISM Weather Sensor"
+match:
+  freq_range: [430.0, 435.0]
+  burst_duration_range: [50, 500]  # ms
+  pattern: periodic
+  period_range: [30, 120]  # seconds between transmissions
+  modulation: ["OOK", "FSK"]
+models: ["Acurite-*", "LaCrosse-*", "Thermopro-*", "Oregon-*", "Ambient-*", "Fine-*"]
+priority: 10
+description: "ISM-band weather/temperature/humidity sensors using OOK or FSK modulation"

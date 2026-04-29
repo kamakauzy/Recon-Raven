@@ -78,6 +78,7 @@ def run_power_scan(args):
         "-i", interval,
         "-g", str(args.gain),
         "-p", str(args.ppm),
+        "-d", str(getattr(args, 'device', 0) or 0),
     ]
 
     if args.duration > 0:
@@ -143,9 +144,33 @@ def run_power_scan(args):
                         pass
 
                     ts_now = datetime.now().strftime("%H:%M:%S")
-                    print(f"[{ts_now}] Sweep #{scan_count:>4d}  "
-                          f"elapsed={elapsed:.0f}s  peak={peak_power:.1f}dB",
-                          flush=True)
+                    if getattr(args, 'json_events', False) and 'powers' in dir():
+                        import json as _json
+                        try:
+                            # Re-parse last line for full frame
+                            with open(csv_file, "r") as jf:
+                                last_line = None
+                                for last_line in jf:
+                                    pass
+                                if last_line:
+                                    jp = last_line.strip().split(",")
+                                    if len(jp) > 6:
+                                        frame = {
+                                            "event_type": "spectrum",
+                                            "timestamp": f"{jp[0]} {jp[1]}",
+                                            "freq_start_mhz": float(jp[2]) / 1e6,
+                                            "freq_end_mhz": float(jp[3]) / 1e6,
+                                            "bin_hz": float(jp[4]),
+                                            "powers": [float(x) for x in jp[6:] if x.strip()],
+                                            "sweep_num": scan_count,
+                                        }
+                                        print(_json.dumps(frame), flush=True)
+                        except Exception:
+                            pass
+                    else:
+                        print(f"[{ts_now}] Sweep #{scan_count:>4d}  "
+                              f"elapsed={elapsed:.0f}s  peak={peak_power:.1f}dB",
+                              flush=True)
 
         # Process finished
         elapsed = time.time() - start_time
@@ -283,6 +308,10 @@ Feed data into baseline_diff.py for change detection.
                         help="Output directory (default: ~/SIGINT/logs)")
     parser.add_argument("--heatmap", action="store_true",
                         help="Generate heatmap image after completion (needs numpy+matplotlib)")
+    parser.add_argument("--device", type=int, default=0,
+                        help="RTL-SDR device index (default: 0)")
+    parser.add_argument("--json-events", dest="json_events", action="store_true",
+                        help="Emit JSON spectrum frames on stdout for WebSocket streaming")
 
     args = parser.parse_args()
 

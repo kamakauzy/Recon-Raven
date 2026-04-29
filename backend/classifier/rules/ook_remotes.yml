@@ -1,0 +1,11 @@
+# OOK remote controls — garage doors, car fobs, doorbells
+name: "OOK Remote Control"
+match:
+  freq_range: [300.0, 320.0, 433.0, 435.0]  # 315 and 433 bands
+  burst_duration_range: [5, 100]  # ms — short key-press bursts
+  pattern: burst_group
+  group_count_range: [3, 10]  # repeated transmissions per press
+  modulation: ["OOK", "ASK"]
+models: []
+priority: 20
+description: "OOK/ASK remote controls: garage doors, car key fobs, doorbells, gate openers"

@@ -1,0 +1,11 @@
+# TPMS — Tire Pressure Monitoring Systems
+name: "TPMS"
+match:
+  freq_range: [314.0, 316.0, 433.0, 435.0]
+  burst_duration_range: [10, 100]  # ms
+  pattern: periodic
+  period_range: [15, 120]
+  modulation: ["FSK", "OOK", "ASK"]
+models: ["Toyota", "Schrader", "Steelmate", "PMV", "Citroen", "Ford"]
+priority: 25
+description: "Tire Pressure Monitoring System transmissions from vehicles"

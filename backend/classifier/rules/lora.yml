@@ -1,0 +1,10 @@
+# LoRa chirp spread spectrum
+name: "LoRa"
+match:
+  freq_range: [902.0, 928.0, 868.0, 870.0, 433.0, 435.0]
+  burst_duration_range: [50, 5000]  # ms — varies with SF
+  bandwidth_khz_range: [125, 500]
+  modulation: ["CSS"]  # chirp spread spectrum
+models: ["Meshtastic", "Helium", "LoRaWAN", "TTN"]
+priority: 15
+description: "LoRa chirp spread spectrum signals — Meshtastic, Helium, IoT gateways"

@@ -60,8 +60,11 @@ class BurstDetector(gr.top_block):
         self._current_sink = None
         self._current_file = None
 
+        self.json_events = getattr(args, 'json_events', False)
+
         # ── Source ──
-        self.source = osmosdr.source(args="")
+        device_index = getattr(args, 'device', 0) or 0
+        self.source = osmosdr.source(args=f"rtl={device_index}")
         self.source.set_sample_rate(self.samp_rate)
         self.source.set_center_freq(self.freq)
         self.source.set_gain(self.gain)
@@ -208,6 +211,20 @@ class BurstDetector(gr.top_block):
                 ])
                 self._csv_file.flush()
 
+            # JSON event line (for capture_service integration)
+            if self.json_events:
+                import json
+                event = {
+                    "event_type": "burst",
+                    "timestamp": ts_utc,
+                    "freq_mhz": freq_mhz,
+                    "duration_ms": round(duration_ms, 1),
+                    "peak_power_db": round(self._burst_peak, 1),
+                    "iq_file": iq_file,
+                    "burst_num": self._burst_count,
+                }
+                print(json.dumps(event), flush=True)
+
         self._in_burst = False
         self._burst_start = None
         self._burst_peak = -999
@@ -250,6 +267,10 @@ Feed the CSV into baseline_diff.py or intel_packager.py for F3EAD analysis.
                         help="Append burst log to CSV file")
     parser.add_argument("--min-burst", dest="min_burst", type=float, default=0.02,
                         help="Minimum burst duration in seconds (default: 0.02)")
+    parser.add_argument("-d", "--device", type=int, default=0,
+                        help="RTL-SDR device index (default: 0)")
+    parser.add_argument("--json-events", dest="json_events", action="store_true",
+                        help="Emit JSON event lines on stdout for integration")
 
     args = parser.parse_args()
 

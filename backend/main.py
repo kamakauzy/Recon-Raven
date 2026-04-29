@@ -11,13 +11,18 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import load_settings
 from .db.database import init_db, get_session_factory
-from .api.routes import router as api_router, set_session_factory, set_services
+from .api.routes import router as api_router, set_session_factory, set_services, set_scheduler, set_classifier, set_tx_service, set_fissure_service, set_push_service
 from .api.websocket import (
     ws_manager, spectrum_endpoint, alerts_endpoint, status_endpoint,
 )
 from .services.device_manager import DeviceManager
 from .services.gps_poller import GPSPoller
 from .services.capture_service import CaptureService
+from .services.scheduler import RavenScheduler
+from .services.classifier import Classifier
+from .services.tx_service import TXService
+from .services.fissure_service import FissureService
+from .services.push_service import PushService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,6 +37,7 @@ settings = load_settings()
 device_manager: DeviceManager = None
 gps_poller: GPSPoller = None
 capture_service: CaptureService = None
+scheduler: RavenScheduler = None
 _health_task: asyncio.Task = None
 
 
@@ -62,7 +68,7 @@ async def _periodic_health_check():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global device_manager, gps_poller, capture_service, _health_task
+    global device_manager, gps_poller, capture_service, scheduler, _health_task
 
     logger.info("Starting Recon-Raven v0.1.0")
     logger.info("Data dir: %s", settings.data_dir)
@@ -94,19 +100,57 @@ async def lifespan(app: FastAPI):
         await gps_poller.start()
 
     # 4. Capture service
+    classifier = Classifier(
+        rules_dir=str(Path(settings.engine_dir).parent / "backend" / "classifier" / "rules"),
+    )
     capture_service = CaptureService(
         engine_dir=settings.engine_dir,
         device_manager=device_manager,
         gps_poller=gps_poller,
         db_path=settings.db_path,
         capture_config=settings.capture,
+        classifier=classifier,
     )
-    capture_service.set_event_callback(ws_manager.broadcast_alert)
 
     # 5. Wire up API routes
     set_services(device_manager, gps_poller, capture_service)
+    set_classifier(classifier)
 
-    # 6. Start periodic health checks
+    # 5b. TX Service
+    tx_service = TXService(settings, device_manager, settings.db_path)
+    set_tx_service(tx_service)
+
+    # 5c. FISSURE Service
+    fissure_service = FissureService(settings)
+    set_fissure_service(fissure_service)
+
+    # 5d. Push notification service
+    push_service = PushService(db_path=settings.db_path)
+    set_push_service(push_service)
+
+    # Wire push notifications into the alert broadcast chain
+    original_broadcast = ws_manager.broadcast_alert
+
+    async def broadcast_with_push(event_data):
+        await original_broadcast(event_data)
+        try:
+            await push_service.send_signal_alert(event_data)
+        except Exception as e:
+            logger.debug("Push notification error: %s", e)
+
+    capture_service.set_event_callback(broadcast_with_push)
+
+    # 6. Scheduler
+    scheduler = RavenScheduler(
+        settings=settings,
+        capture_service=capture_service,
+        device_manager=device_manager,
+        db_path=settings.db_path,
+    )
+    scheduler.start()
+    set_scheduler(scheduler)
+
+    # 7. Start periodic health checks
     _health_task = asyncio.create_task(_periodic_health_check())
 
     logger.info("Recon-Raven ready — http://%s:%d", settings.server.host, settings.server.port)
@@ -127,6 +171,7 @@ async def lifespan(app: FastAPI):
     for task in capture_service.list_active():
         await capture_service.stop_capture(task.task_id)
 
+    scheduler.stop()
     await gps_poller.stop()
     logger.info("Shutdown complete")
 

@@ -46,6 +46,7 @@ class SquelchRecorder(gr.top_block):
         self.outdir.mkdir(parents=True, exist_ok=True)
         self.min_duration = args.min_duration
         self.max_duration = args.max_duration
+        self.json_events = getattr(args, 'json_events', False)
 
         self._recording = False
         self._rec_start = None
@@ -54,7 +55,8 @@ class SquelchRecorder(gr.top_block):
         self._capture_count = 0
 
         # ── Source ──
-        self.source = osmosdr.source(args="")
+        device_index = getattr(args, 'device', 0) or 0
+        self.source = osmosdr.source(args=f"rtl={device_index}")
         self.source.set_sample_rate(self.samp_rate)
         self.source.set_center_freq(self.freq)
         self.source.set_gain(self.gain)
@@ -141,6 +143,17 @@ class SquelchRecorder(gr.top_block):
         self._capture_count += 1
         self._log(f"REC START → {fname}")
 
+        if self.json_events:
+            import json
+            event = {
+                "event_type": "rec_start",
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+                "freq_mhz": self.freq / 1e6,
+                "file": fname,
+                "capture_num": self._capture_count,
+            }
+            print(json.dumps(event), flush=True)
+
     def _stop_recording(self):
         elapsed = time.time() - self._rec_start if self._rec_start else 0
 
@@ -158,11 +171,26 @@ class SquelchRecorder(gr.top_block):
         fsize = self._current_file.stat().st_size if self._current_file and self._current_file.exists() else 0
         self._log(f"REC STOP  → {elapsed:.1f}s, {fsize / 1024:.1f} KB")
 
+        kept = True
         # Delete captures shorter than min_duration (noise triggers)
         if elapsed < self.min_duration and self._current_file and self._current_file.exists():
             self._current_file.unlink()
             self._log(f"  Deleted (shorter than {self.min_duration}s minimum)")
             self._capture_count -= 1
+            kept = False
+
+        if kept and self.json_events:
+            import json
+            event = {
+                "event_type": "rec_stop",
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+                "freq_mhz": self.freq / 1e6,
+                "file": str(self._current_file) if self._current_file else "",
+                "duration_s": round(elapsed, 1),
+                "size_kb": round(fsize / 1024, 1),
+                "capture_num": self._capture_count,
+            }
+            print(json.dumps(event), flush=True)
 
         self._recording = False
         self._rec_start = None
@@ -204,6 +232,10 @@ Open captures in URH, inspectrum, or GNU Radio for analysis.
                         help="Maximum capture duration in seconds before file split (default: 300)")
     parser.add_argument("--headless", action="store_true",
                         help="No GUI, pure console output for LP/OP deployment")
+    parser.add_argument("-d", "--device", type=int, default=0,
+                        help="RTL-SDR device index (default: 0)")
+    parser.add_argument("--json-events", dest="json_events", action="store_true",
+                        help="Emit JSON event lines on stdout for integration")
 
     args = parser.parse_args()
 
