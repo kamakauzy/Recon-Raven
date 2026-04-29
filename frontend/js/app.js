@@ -17,6 +17,12 @@
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       tab.classList.add('active');
       document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      // Init + fix Leaflet map after browser layout completes
+      if (tab.dataset.tab === 'map' && window.RavenMap) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          window.RavenMap.init();
+        }));
+      }
     });
   });
 

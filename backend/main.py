@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import load_settings
 from .db.database import init_db, get_session_factory
 from .api.routes import router as api_router, set_session_factory, set_services, set_scheduler, set_classifier, set_tx_service, set_fissure_service, set_push_service, set_federation_service
+from .api.tile_proxy import router as tile_router
 from .api.websocket import (
     ws_manager, spectrum_endpoint, alerts_endpoint, status_endpoint,
 )
@@ -205,6 +206,7 @@ app = FastAPI(
 )
 
 # REST API
+app.include_router(tile_router)
 app.include_router(api_router)
 
 # WebSocket endpoints

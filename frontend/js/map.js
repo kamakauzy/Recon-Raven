@@ -1,36 +1,30 @@
 /**
  * Map module — Leaflet.js GPS position + event markers.
+ * Deferred initialization: map is only created when the Map tab is first shown.
  */
 (function() {
   'use strict';
 
-  const mapContainer = document.getElementById('leaflet-map');
-  if (!mapContainer) return;
-
-  // Load Leaflet CSS + JS dynamically
-  const leafletCSS = document.createElement('link');
-  leafletCSS.rel = 'stylesheet';
-  leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-  document.head.appendChild(leafletCSS);
-
-  const leafletJS = document.createElement('script');
-  leafletJS.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-  leafletJS.onload = initMap;
-  document.head.appendChild(leafletJS);
-
   let map = null;
   let positionMarker = null;
   let eventMarkers = [];
+  let gpsInterval = null;
 
   function initMap() {
-    map = L.map('leaflet-map').setView([0, 0], 2);
+    if (map) return; // already initialized
+    if (typeof L === 'undefined') return;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OSM',
+    const el = document.getElementById('leaflet-map');
+    if (!el) return;
+
+    map = L.map('leaflet-map', { zoomControl: true }).setView([34.79, -86.50], 13);
+
+    L.tileLayer('/tiles/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
       maxZoom: 19,
     }).addTo(map);
 
-    // Position marker
+    // GPS position marker
     positionMarker = L.circleMarker([0, 0], {
       radius: 8,
       color: '#00ff88',
@@ -41,7 +35,7 @@
 
     // Start polling GPS
     updatePosition();
-    setInterval(updatePosition, 5000);
+    gpsInterval = setInterval(updatePosition, 5000);
 
     // Load event markers
     loadEventMarkers();
@@ -56,57 +50,63 @@
         const latlng = [gps.latitude, gps.longitude];
         positionMarker.setLatLng(latlng);
         positionMarker.setPopupContent(
-          `<strong>GPS Position</strong><br>` +
-          `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}<br>` +
-          `Alt: ${gps.altitude_m ? gps.altitude_m.toFixed(1) + 'm' : 'N/A'}<br>` +
-          `Sats: ${gps.satellites || 'N/A'}`
+          '<strong>GPS Position</strong><br>' +
+          gps.latitude.toFixed(6) + ', ' + gps.longitude.toFixed(6) + '<br>' +
+          'Alt: ' + (gps.altitude_m ? gps.altitude_m.toFixed(1) + 'm' : 'N/A') + '<br>' +
+          'Sats: ' + (gps.satellites || 'N/A')
         );
 
-        if (map.getZoom() <= 2) {
+        // Auto-center only on first GPS fix
+        if (map.getZoom() <= 13) {
           map.setView(latlng, 15);
         }
       }
-    } catch (e) {
-      // GPS unavailable
-    }
+    } catch (e) { /* GPS unavailable */ }
   }
 
   async function loadEventMarkers() {
+    if (!map) return;
     try {
       const res = await fetch('/api/events?limit=200');
       const events = await res.json();
 
-      // Clear old markers
-      eventMarkers.forEach(m => map.removeLayer(m));
+      eventMarkers.forEach(function(m) { map.removeLayer(m); });
       eventMarkers = [];
 
-      events.forEach(evt => {
+      events.forEach(function(evt) {
         if (!evt.latitude || !evt.longitude) return;
 
-        const color = evt.event_type === 'burst' ? '#ff4444' :
-                      evt.event_type === 'alert' ? '#ffaa00' : '#4488ff';
+        var color = evt.event_type === 'burst' ? '#ff4444' :
+                    evt.event_type === 'alert' ? '#ffaa00' : '#4488ff';
 
-        const marker = L.circleMarker([evt.latitude, evt.longitude], {
-          radius: 5,
-          color: color,
-          fillColor: color,
-          fillOpacity: 0.6,
+        var marker = L.circleMarker([evt.latitude, evt.longitude], {
+          radius: 5, color: color, fillColor: color, fillOpacity: 0.6,
         }).addTo(map);
 
         marker.bindPopup(
-          `<strong>${evt.event_type}</strong><br>` +
-          `Freq: ${evt.freq_mhz || '?'} MHz<br>` +
-          `Power: ${evt.peak_power_db || '?'} dB<br>` +
-          `${evt.timestamp}`
+          '<strong>' + evt.event_type + '</strong><br>' +
+          'Freq: ' + (evt.freq_mhz || '?') + ' MHz<br>' +
+          'Power: ' + (evt.peak_power_db || '?') + ' dB<br>' +
+          evt.timestamp
         );
-
         eventMarkers.push(marker);
       });
-    } catch (e) {
-      // Events unavailable
-    }
+    } catch (e) { /* Events unavailable */ }
   }
 
-  // Expose for refresh
-  window.RavenMap = { loadEventMarkers };
+  window.RavenMap = {
+    init: function() {
+      initMap();
+      // Double invalidateSize with delay to ensure tiles fill container
+      if (map) {
+        map.invalidateSize();
+        setTimeout(function() { map.invalidateSize(); }, 300);
+        setTimeout(function() { map.invalidateSize(); }, 600);
+      }
+    },
+    invalidateSize: function() {
+      if (map) map.invalidateSize();
+    },
+    loadEventMarkers: loadEventMarkers
+  };
 })();
