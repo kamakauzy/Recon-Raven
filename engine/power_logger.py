@@ -144,27 +144,43 @@ def run_power_scan(args):
                         pass
 
                     ts_now = datetime.now().strftime("%H:%M:%S")
-                    if getattr(args, 'json_events', False) and 'powers' in dir():
+                    if getattr(args, 'json_events', False):
                         import json as _json
                         try:
-                            # Re-parse last line for full frame
+                            # Aggregate all sub-band lines from latest sweep
                             with open(csv_file, "r") as jf:
-                                last_line = None
-                                for last_line in jf:
-                                    pass
-                                if last_line:
-                                    jp = last_line.strip().split(",")
-                                    if len(jp) > 6:
-                                        frame = {
-                                            "event_type": "spectrum",
-                                            "timestamp": f"{jp[0]} {jp[1]}",
-                                            "freq_start_mhz": float(jp[2]) / 1e6,
-                                            "freq_end_mhz": float(jp[3]) / 1e6,
-                                            "bin_hz": float(jp[4]),
-                                            "powers": [float(x) for x in jp[6:] if x.strip()],
-                                            "sweep_num": scan_count,
-                                        }
-                                        print(_json.dumps(frame), flush=True)
+                                lines = jf.readlines()
+                            # Group lines by timestamp (same sweep)
+                            if lines:
+                                last_ts = None
+                                sweep_lines = []
+                                for line in reversed(lines):
+                                    parts = line.strip().split(",")
+                                    if len(parts) < 7:
+                                        continue
+                                    ts_key = f"{parts[0]},{parts[1]}"
+                                    if last_ts is None:
+                                        last_ts = ts_key
+                                    if ts_key == last_ts:
+                                        sweep_lines.append(parts)
+                                    else:
+                                        break
+                                # Sort by freq_low ascending
+                                sweep_lines.sort(key=lambda p: float(p[2]))
+                                if sweep_lines:
+                                    all_powers = []
+                                    for p in sweep_lines:
+                                        all_powers.extend(float(x) for x in p[6:] if x.strip())
+                                    frame = {
+                                        "event_type": "spectrum",
+                                        "timestamp": f"{sweep_lines[0][0]} {sweep_lines[0][1]}",
+                                        "freq_start_mhz": float(sweep_lines[0][2]) / 1e6,
+                                        "freq_end_mhz": float(sweep_lines[-1][3]) / 1e6,
+                                        "bin_hz": float(sweep_lines[0][4]),
+                                        "powers": all_powers,
+                                        "sweep_num": scan_count,
+                                    }
+                                    print(_json.dumps(frame), flush=True)
                         except Exception:
                             pass
                     else:

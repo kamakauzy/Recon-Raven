@@ -247,6 +247,12 @@ class CaptureService:
 
     async def _handle_event(self, task: CaptureTask, event_data: dict):
         """Process a real-time event from an engine script."""
+        # Spectrum frames are ephemeral — broadcast only, don't persist to DB
+        if event_data.get("event_type") == "spectrum":
+            if self._event_callback:
+                await self._event_callback(event_data)
+            return
+
         session_factory = get_session_factory(self._db_path)
         async with session_factory() as session:
             gps_fix_id = await self._gps.get_latest_fix_id()
@@ -265,7 +271,7 @@ class CaptureService:
             await session.commit()
 
         # Classify the event
-        if self._classifier and event_data.get("event_type") != "spectrum":
+        if self._classifier:
             try:
                 result = self._classifier.classify(event_data)
                 event_data["classification"] = result.to_dict()

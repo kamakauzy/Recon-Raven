@@ -18,11 +18,18 @@
   let freqEnd = 450;
   let ws = null;
 
-  // Resize canvas to container
+  // Set canvas pixel buffer to match displayed size.
+  // Some embedded browsers (VS Code Simple Browser) report clientWidth=0.
+  // In that case, keep the HTML-attribute default (1200x400) and let CSS scale display.
   function resizeCanvas() {
-    const container = canvas.parentElement;
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight || 400;
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width || canvas.offsetWidth;
+    const h = rect.height || canvas.offsetHeight;
+    if (w > 50 && h > 50) {
+      canvas.width = Math.round(w);
+      canvas.height = Math.round(h);
+    }
+    // else: keep existing canvas.width/height (1200x400 from HTML attr)
   }
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();

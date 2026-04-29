@@ -134,6 +134,10 @@ async def lifespan(app: FastAPI):
     original_broadcast = ws_manager.broadcast_alert
 
     async def broadcast_with_push(event_data):
+        # Route spectrum frames to spectrum WS channel
+        if event_data.get("event_type") == "spectrum":
+            await ws_manager.broadcast_spectrum_frame(event_data)
+            return
         await original_broadcast(event_data)
         try:
             await push_service.send_signal_alert(event_data)
