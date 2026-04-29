@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recon-Raven</title>
-  <link rel="stylesheet" href="/css/dashboard.css">
+  <link rel="stylesheet" href="/css/dashboard.css?v=2">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#0a0a0a">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🦅</text></svg>">
@@ -42,14 +42,14 @@
     <section id="tab-spectrum" class="tab-panel active">
       <div class="panel-header">
         <h2>Live Spectrum</h2>
-        <div class="controls">
-          <label>SDR: <select id="spectrum-sdr"></select></label>
-          <label>Low: <input type="number" id="spectrum-low" value="430" step="0.1"> MHz</label>
-          <label>High: <input type="number" id="spectrum-high" value="440" step="0.1"> MHz</label>
-          <label>Gain: <input type="range" id="spectrum-gain" min="0" max="50" value="38"><span id="spectrum-gain-val">38</span></label>
-          <button id="spectrum-start" class="btn btn-green">Start</button>
-          <button id="spectrum-stop" class="btn btn-red" disabled>Stop</button>
-        </div>
+      </div>
+      <div class="controls" style="margin-bottom:12px;">
+        <label>SDR: <select id="spectrum-sdr"></select></label>
+        <label>Low: <input type="number" id="spectrum-low" value="430" step="0.1"> MHz</label>
+        <label>High: <input type="number" id="spectrum-high" value="440" step="0.1"> MHz</label>
+        <label>Gain: <input type="range" id="spectrum-gain" min="0" max="50" value="38"><span id="spectrum-gain-val">38</span></label>
+        <button id="spectrum-start" class="btn btn-green">Start</button>
+        <button id="spectrum-stop" class="btn btn-red" disabled>Stop</button>
       </div>
       <canvas id="waterfall" width="1200" height="400"></canvas>
       <div id="spectrum-peak" class="status-bar" style="text-align:right; font-size:12px;"></div>
@@ -60,15 +60,15 @@
     <section id="tab-alerts" class="tab-panel">
       <div class="panel-header">
         <h2>Alert Feed</h2>
-        <div class="controls">
-          <label>Type: <select id="alert-filter-type">
-            <option value="">All</option>
-            <option value="burst">Burst</option>
-            <option value="alert">Alert</option>
-          </select></label>
-          <span id="alert-count">0 events</span>
-          <span id="alert-live" class="badge live">LIVE</span>
-        </div>
+      </div>
+      <div class="controls" style="margin-bottom:12px;">
+        <label>Type: <select id="alert-filter-type">
+          <option value="">All</option>
+          <option value="burst">Burst</option>
+          <option value="alert">Alert</option>
+        </select></label>
+        <span id="alert-count">0 events</span>
+        <span id="alert-live" class="badge live">LIVE</span>
       </div>
       <div id="alert-feed" class="feed"></div>
     </section>

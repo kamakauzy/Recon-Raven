@@ -89,6 +89,10 @@ body {
   gap: 10px;
 }
 
+.panel-header .controls {
+  flex-basis: 100%;
+}
+
 .panel-header h2 { font-size: 16px; font-weight: 600; }
 
 /* Controls */
@@ -253,11 +257,34 @@ body {
   line-height: 1.7;
 }
 
-/* Mobile */
-@media (max-width: 768px) {
-  .controls { flex-direction: column; align-items: flex-start; }
+/* DF bearing rows — keep lat/lon/bearing on one line */
+.df-bearing-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  margin-bottom: 6px;
+}
+.df-bearing-row label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* Tab bar scrollbar styling */
+#tab-bar { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+#tab-bar::-webkit-scrollbar { height: 4px; }
+#tab-bar::-webkit-scrollbar-track { background: transparent; }
+#tab-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .controls { flex-wrap: wrap; }
   .panel-header { flex-direction: column; align-items: flex-start; }
   .card-grid { grid-template-columns: 1fr; }
   #waterfall { height: 250px; }
   .tab { padding: 8px 12px; font-size: 12px; }
+  .df-bearing-row { flex-wrap: wrap !important; }
 }
