@@ -164,6 +164,17 @@ class CaptureService:
         # Start output reader
         asyncio.create_task(self._read_output(task))
 
+        # Schedule auto-stop after duration (if specified)
+        if duration > 0:
+            asyncio.create_task(self._auto_stop(task, duration))
+
+    async def _auto_stop(self, task: CaptureTask, duration: int):
+        """Auto-stop a capture after the specified duration."""
+        await asyncio.sleep(duration)
+        if task.status == 'running':
+            logger.info('Auto-stopping %s after %ds', task.task_id, duration)
+            await self.stop_capture(task.task_id)
+
     async def _start_baseline(self, task: CaptureTask, duration: int, ts: str):
         """Run rtl_433 baseline capture."""
         duration = duration or 120
