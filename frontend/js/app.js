@@ -261,6 +261,27 @@
     }
   }
 
+
+  // ── Report Generation ───────────────────────────────────
+  document.getElementById('btn-generate-report').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-generate-report');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    try {
+      const result = await api('/reports/generate', { method: 'POST' });
+      await loadReports();
+      if (result && result.id) {
+        loadReport(result.id);
+      }
+    } catch (e) {
+      console.error('Report generation failed:', e);
+      alert('Report generation failed: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate Now';
+    }
+  });
+
   // ── Spectrum Controls ───────────────────────────────────
   document.getElementById('spectrum-gain').addEventListener('input', (e) => {
     document.getElementById('spectrum-gain-val').textContent = e.target.value;
